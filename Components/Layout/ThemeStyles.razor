@@ -1,0 +1,22 @@
+@using TradingTools.Blazor.Theme
+@* Emits CSS custom properties from Theme/AppTheme.cs so every hand-written style in the app
+   (sidebar, cards, charts) reads the same tokens as the MudBlazor theme.
+   There is nothing to edit here — change colors in Theme/AppTheme.cs only. *@
+<style>
+    :root {
+        --app-bg: @AppTheme.Background;
+        --app-surface: @AppTheme.Surface;
+        --app-surface-variant: @AppTheme.SurfaceVariant;
+        --app-surface-highlight: @AppTheme.SurfaceHighlight;
+        --app-border: @AppTheme.Border;
+        --app-border-accent: @AppTheme.BorderAccent;
+        --app-text-primary: @AppTheme.TextPrimary;
+        --app-text-secondary: @AppTheme.TextSecondary;
+        --app-text-disabled: @AppTheme.TextDisabled;
+        --app-accent: @AppTheme.Accent;
+        --app-accent-darken: @AppTheme.AccentDarken;
+        --app-accent-lighten: @AppTheme.AccentLighten;
+        --app-accent-contrast: @AppTheme.AccentContrastText;
+        --app-error: @AppTheme.Error;
+    }
+</style>

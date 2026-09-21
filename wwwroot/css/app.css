@@ -1,0 +1,296 @@
+/* Layout and component styles for the trading journal.
+   Colors always come from the CSS variables emitted by Components/Layout/ThemeStyles.razor
+   (which in turn come from Theme/AppTheme.cs) — never hard-code a color here. */
+
+html, body {
+    margin: 0;
+    background: var(--app-bg);
+    color: var(--app-text-primary);
+    font-family: 'Manrope', system-ui, -apple-system, sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+a {
+    color: var(--app-accent);
+    text-decoration: none;
+}
+a:hover {
+    color: var(--app-accent-lighten);
+}
+
+.app-shell {
+    display: flex;
+    min-height: 100vh;
+    background: var(--app-bg);
+}
+
+/* ---------- Sidebar ---------- */
+
+.app-sidebar {
+    width: 240px;
+    flex-shrink: 0;
+    background: var(--app-surface);
+    border-right: 1px solid var(--app-border);
+    display: flex;
+    flex-direction: column;
+    padding: 22px 14px;
+}
+
+.app-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px 26px 10px;
+}
+.app-brand-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--app-accent) 16%, transparent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--app-accent);
+}
+.app-brand-name {
+    font-weight: 800;
+    font-size: 15px;
+    letter-spacing: -0.01em;
+}
+
+.app-nav-heading {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    color: var(--app-text-secondary);
+    padding: 8px 14px 6px;
+}
+
+.app-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    color: var(--app-text-secondary);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.app-nav-item:hover {
+    background: var(--app-surface-variant);
+    color: var(--app-text-primary);
+}
+.app-nav-item.active,
+.app-nav-item.active:hover {
+    background: color-mix(in srgb, var(--app-accent) 16%, transparent);
+    color: var(--app-accent);
+}
+.app-nav-item svg {
+    flex-shrink: 0;
+}
+
+.app-sidebar-footer {
+    margin-top: auto;
+    padding: 14px 10px 4px;
+    border-top: 1px solid var(--app-border);
+}
+.app-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    background: var(--app-surface-highlight);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--app-text-secondary);
+}
+
+/* ---------- Main column / topbar ---------- */
+
+.app-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.app-topbar {
+    height: 64px;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--app-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+}
+.app-topbar-title {
+    font-size: 15px;
+    font-weight: 800;
+}
+
+.app-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--app-accent);
+    color: var(--app-accent-contrast);
+    font-weight: 700;
+    font-size: 13px;
+    padding: 9px 18px 9px 14px;
+    border-radius: 999px;
+    border: none;
+    cursor: pointer;
+}
+.app-btn-primary:hover {
+    background: var(--app-accent-lighten);
+}
+
+.app-content {
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* ---------- Cards & chips ---------- */
+
+.app-card {
+    background-color: var(--app-surface);
+    background-image: radial-gradient(120% 120% at 100% 0%, color-mix(in srgb, var(--app-accent) 10%, transparent), transparent 60%);
+    border: 1px solid var(--app-border-accent);
+    border-radius: 16px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.55), 0 14px 30px -14px rgba(0,0,0,0.8);
+}
+
+.app-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+}
+.app-chip-green { background: color-mix(in srgb, var(--app-accent) 16%, transparent); color: var(--app-accent); }
+.app-chip-red { background: color-mix(in srgb, var(--app-error) 16%, transparent); color: var(--app-error); }
+.app-chip-neutral { background: var(--app-surface-highlight); color: var(--app-text-secondary); }
+
+.app-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--app-surface-variant);
+    border: 1px solid var(--app-border);
+    border-radius: 10px;
+    padding: 9px 12px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--app-text-secondary);
+    white-space: nowrap;
+}
+
+.app-field label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--app-text-secondary);
+    letter-spacing: .03em;
+    margin-bottom: 7px;
+}
+
+.app-mono {
+    font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+}
+
+.app-nav-counter {
+    display: flex;
+    align-items: center;
+    background: var(--app-surface);
+    border: 1px solid var(--app-border);
+    border-radius: 10px;
+    overflow: hidden;
+}
+.app-nav-counter button {
+    background: none;
+    border: none;
+    color: var(--app-text-secondary);
+    padding: 9px 12px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+.app-nav-counter button:hover:not(:disabled) {
+    color: var(--app-accent);
+}
+.app-nav-counter button:disabled {
+    color: var(--app-text-disabled);
+    cursor: default;
+}
+.app-nav-counter .app-nav-counter-value {
+    padding: 9px 14px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 13px;
+    font-weight: 600;
+    border-left: 1px solid var(--app-border);
+    border-right: 1px solid var(--app-border);
+}
+
+.app-carousel-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    background: rgba(10, 15, 13, 0.7);
+    border: none;
+    color: var(--app-text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+.app-carousel-btn:hover {
+    background: rgba(10, 15, 13, 0.9);
+}
+
+/* MudBlazor overrides so its components sit on the same dark, near-black world */
+.mud-typography {
+    font-family: 'Manrope', system-ui, -apple-system, sans-serif;
+}
+
+/* ---------- Framework defaults ---------- */
+
+h1:focus {
+    outline: none;
+}
+
+.validation-message {
+    color: var(--app-error);
+}
+
+#blazor-error-ui {
+    background: var(--app-error);
+    color: white;
+    padding: 0.85rem 1.25rem;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: none;
+}
+#blazor-error-ui .reload {
+    color: white;
+    text-decoration: underline;
+    margin-left: 8px;
+}
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    float: right;
+}

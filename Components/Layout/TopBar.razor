@@ -1,0 +1,24 @@
+@inject NavigationManager Nav
+
+<div class="app-topbar">
+    <div class="app-topbar-title">@Title</div>
+    <div style="display:flex; align-items:center; gap:12px;">
+        @ChildContent
+        @if (ShowNewTradeButton)
+        {
+            <button class="app-btn-primary" @onclick="GoToNewTrade">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v8M8 12h8"></path></svg>
+                New Trade
+            </button>
+        }
+        <div class="app-avatar">EA</div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public bool ShowNewTradeButton { get; set; } = true;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private void GoToNewTrade() => Nav.NavigateTo("new-trade");
+}

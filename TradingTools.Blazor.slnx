@@ -1,0 +1,8 @@
+<Solution>
+  <Project Path="../TradingToolsRazor/DataAccess/DataAccess.csproj" />
+  <Project Path="../TradingToolsRazor/Models/Models.csproj" />
+  <Project Path="../TradingToolsRazor/Shared/Shared.csproj" />
+  <Project Path="../TradingToolsRazor/Statistics/Statistics.csproj" />
+  <Project Path="../TradingToolsRazor/Utilities/Utilities.csproj" />
+  <Project Path="TradingTools.Blazor.csproj" />
+</Solution>

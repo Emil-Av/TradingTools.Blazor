@@ -1,0 +1,17 @@
+<PageTitle>@Title</PageTitle>
+
+<TopBar Title="@Title" />
+
+<div class="app-content">
+    <div class="app-card" style="padding:48px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:12px;">
+        <MudIcon Icon="@Icons.Material.Filled.Construction" Style="color:var(--app-text-secondary);" Size="Size.Large" />
+        <MudText Typo="Typo.h6">@Title is not part of this pass yet</MudText>
+        <MudText Typo="Typo.body2" Style="color:var(--app-text-secondary); max-width:52ch;">
+            This screen still runs on the Razor Pages app. It will get its Blazor rewrite in a follow-up.
+        </MudText>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+}

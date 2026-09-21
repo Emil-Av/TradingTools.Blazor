@@ -1,0 +1,143 @@
+@page "/"
+
+<PageTitle>Dashboard</PageTitle>
+
+<TopBar Title="Dashboard" />
+
+<div class="app-content">
+
+    <div>
+        <MudText Typo="Typo.h5" Style="font-weight:800;">Dashboard</MudText>
+        <MudText Typo="Typo.body2" Style="color:var(--app-text-secondary); margin-top:4px;">
+            @DateTime.Now.ToString("dddd, MMMM d") &mdash; here&#8217;s how your trading is going.
+        </MudText>
+    </div>
+
+    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Icon="@Icons.Material.Filled.Info">
+        Showing sample data while the real Dashboard queries are wired up.
+    </MudAlert>
+
+    <MudGrid Spacing="3">
+        @foreach (var kpi in _kpis)
+        {
+            <MudItem xs="12" sm="6" md="3">
+                <div class="app-card" style="padding:20px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between;">
+                        <div style="font-size:12.5px; font-weight:700; color:var(--app-text-secondary); letter-spacing:.02em;">@kpi.Label</div>
+                        <div style="width:30px; height:30px; border-radius:8px; background:@(kpi.IsNegative ? "color-mix(in srgb, var(--app-error) 16%, transparent)" : "color-mix(in srgb, var(--app-accent) 16%, transparent)"); display:flex; align-items:center; justify-content:center;">
+                            <MudIcon Icon="@kpi.Icon" Size="Size.Small" Style="@($"color:{(kpi.IsNegative ? "var(--app-error)" : "var(--app-accent)")}")" />
+                        </div>
+                    </div>
+                    <div class="app-mono" style="font-size:26px; font-weight:600; margin-top:10px; color:@(kpi.IsNegative ? "var(--app-error)" : "var(--app-text-primary)");">@kpi.Value</div>
+                    <div style="font-size:12px; color:var(--app-text-secondary); margin-top:6px;">@kpi.Sub</div>
+                </div>
+            </MudItem>
+        }
+    </MudGrid>
+
+    <MudGrid Spacing="3">
+        <MudItem xs="12" md="8">
+            <div class="app-card" style="padding:22px 24px; height:100%;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+                    <div>
+                        <MudText Typo="Typo.subtitle1" Style="font-weight:700;">Equity Curve</MudText>
+                        <div class="app-mono" style="font-size:20px; font-weight:600; color:var(--app-accent); margin-top:2px;">+$18,420.00</div>
+                    </div>
+                </div>
+                <MudChart T="double" ChartType="ChartType.Line" ChartSeries="_equitySeries" ChartLabels="_equityLabels"
+                          Width="100%" Height="280px" ChartOptions="_chartOptions" />
+            </div>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <div class="app-card" style="padding:22px; height:100%; display:flex; flex-direction:column;">
+                <MudText Typo="Typo.subtitle1" Style="font-weight:700; margin-bottom:14px;">Performance by Strategy</MudText>
+                <div style="display:flex; flex-direction:column; gap:14px;">
+                    @foreach (var s in _strategyBreakdown)
+                    {
+                        <div>
+                            <div style="display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:6px;">
+                                <span style="font-weight:600;">@s.Name</span>
+                                <span class="app-mono" style="color:var(--app-text-secondary);">@s.WinRate%</span>
+                            </div>
+                            <div style="height:6px; border-radius:999px; background:var(--app-surface-variant);">
+                                <div style="width:@(s.WinRate)%; height:100%; border-radius:999px; background:var(--app-accent);"></div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </MudItem>
+    </MudGrid>
+
+    <div class="app-card" style="padding:8px 0 4px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 24px 10px;">
+            <MudText Typo="Typo.subtitle1" Style="font-weight:700;">Recent Trades</MudText>
+        </div>
+        <MudTable Items="_recentTrades" Dense="true" Hover="true" Elevation="0" Class="app-recent-trades">
+            <HeaderContent>
+                <MudTh>Date</MudTh>
+                <MudTh>Symbol</MudTh>
+                <MudTh>Dir</MudTh>
+                <MudTh>Strategy</MudTh>
+                <MudTh>R</MudTh>
+                <MudTh>P&amp;L</MudTh>
+                <MudTh>Outcome</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Date" Style="color:var(--app-text-secondary);">@context.Date</MudTd>
+                <MudTd DataLabel="Symbol"><span class="app-mono" style="font-weight:700;">@context.Symbol</span></MudTd>
+                <MudTd DataLabel="Dir"><span class="app-chip @(context.Direction == "Long" ? "app-chip-green" : "app-chip-red")">@context.Direction</span></MudTd>
+                <MudTd DataLabel="Strategy" Style="color:var(--app-text-secondary);">@context.Strategy</MudTd>
+                <MudTd DataLabel="R"><span class="app-mono">@context.R</span></MudTd>
+                <MudTd DataLabel="P&amp;L"><span class="app-mono" style="font-weight:600; color:@(context.PnL.StartsWith('-') ? "var(--app-error)" : "var(--app-accent)");">@context.PnL</span></MudTd>
+                <MudTd DataLabel="Outcome"><span class="app-chip @(context.Outcome switch { "Win" => "app-chip-green", "Loss" => "app-chip-red", _ => "app-chip-neutral" })">@context.Outcome</span></MudTd>
+            </RowTemplate>
+        </MudTable>
+    </div>
+
+</div>
+
+@code {
+    // Mock data — the Dashboard's real trade-aggregation queries will replace this later.
+    private readonly List<Kpi> _kpis =
+    [
+        new("WIN RATE", "64%", "43W · 24L this quarter", Icons.Material.Filled.TrackChanges, false),
+        new("TOTAL P&L", "+$18,420", "+12.4% vs last month", Icons.Material.Filled.TrendingUp, false),
+        new("AVG R MULTIPLE", "1.8R", "Target 2.0R", Icons.Material.Filled.SsidChart, false),
+        new("CURRENT STREAK", "5 Wins", "Best streak: 9 (Feb)", Icons.Material.Filled.LocalFireDepartment, false),
+    ];
+
+    private readonly string[] _equityLabels = ["May", "Jun", "Jul", "Aug", "Today"];
+    private List<ChartSeries<double>> _equitySeries =
+    [
+        new ChartSeries<double> { Name = "Equity", Data = new ChartData<double>(new double[] { 4200, 3900, 5800, 6600, 8900, 7600, 11200, 14800, 18420 }) }
+    ];
+    private readonly ChartOptions _chartOptions = new()
+    {
+        ChartPalette = ["#19d472"],
+    };
+
+    private readonly List<StrategyStat> _strategyBreakdown =
+    [
+        new("Cradle", 71),
+        new("Candle Bracketing", 64),
+        new("SRS", 58),
+        new("BrunchBreak", 55),
+        new("Espresso", 45),
+        new("First Bar Pullback", 52),
+    ];
+
+    private readonly List<RecentTrade> _recentTrades =
+    [
+        new("Aug 21", "NQ", "Long", "Cradle", "2.1R", "+$540", "Win"),
+        new("Aug 20", "ES", "Short", "SRS", "-1.0R", "-$210", "Loss"),
+        new("Aug 20", "NQ", "Long", "Candle Bracketing", "1.4R", "+$310", "Win"),
+        new("Aug 19", "CL", "Short", "Espresso", "0.0R", "$0", "Breakeven"),
+        new("Aug 18", "GC", "Long", "First Bar Pullback", "3.2R", "+$860", "Win"),
+        new("Aug 15", "YM", "Short", "BrunchBreak", "-1.0R", "-$180", "Loss"),
+    ];
+
+    private record Kpi(string Label, string Value, string Sub, string Icon, bool IsNegative);
+    private record StrategyStat(string Name, int WinRate);
+    private record RecentTrade(string Date, string Symbol, string Direction, string Strategy, string R, string PnL, string Outcome);
+}

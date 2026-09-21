@@ -1,0 +1,167 @@
+@page "/new-trade"
+@rendermode InteractiveServer
+
+<PageTitle>New Trade</PageTitle>
+
+<TopBar Title="New Trade" ShowNewTradeButton="false" />
+
+<div class="app-content" style="align-items:center;">
+    <div style="width:100%; max-width:920px; display:flex; flex-direction:column; gap:20px;">
+
+        <div>
+            <MudText Typo="Typo.h5" Style="font-weight:800;">Log a New Trade</MudText>
+            <MudText Typo="Typo.body2" Style="color:var(--app-text-secondary); margin-top:4px;">Capture the setup while it&#8217;s fresh &mdash; you can fill in the journal later.</MudText>
+        </div>
+
+        <div class="app-card" style="padding:24px;">
+            <MudText Typo="Typo.subtitle1" Style="font-weight:700; margin-bottom:16px;">Sample</MudText>
+            <MudGrid Spacing="3">
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="Strategy" @bind-Value="_sizeData.Strategy" Label="Strategy" Variant="Variant.Outlined" Dense="true">
+                        <MudSelectItem Value="Strategy.SRS">SRS</MudSelectItem>
+                        <MudSelectItem Value="Strategy.BrunchBreak">BrunchBreak</MudSelectItem>
+                        <MudSelectItem Value="Strategy.Espresso">Espresso</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="TimeFrame" @bind-Value="_sizeData.TimeFrame" Label="Timeframe" Variant="Variant.Outlined" Dense="true">
+                        @foreach (var tf in Enum.GetValues<TimeFrame>())
+                        {
+                            <MudSelectItem Value="@tf">@MyEnumConverter.TimeFrameFromEnum(tf)</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="SampleSizeType" @bind-Value="_sizeData.SampleSizeType" Label="Type" Variant="Variant.Outlined" Dense="true">
+                        <MudSelectItem Value="SampleSizeType.Trade">Trade</MudSelectItem>
+                        <MudSelectItem Value="SampleSizeType.DemoTrading">Demo Trading</MudSelectItem>
+                        <MudSelectItem Value="SampleSizeType.PaperTrade">Paper Trade</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+        </div>
+
+        <div class="app-card" style="padding:24px;">
+            <MudText Typo="Typo.subtitle1" Style="font-weight:700; margin-bottom:16px;">Screenshots</MudText>
+
+            <label for="screenshotInput" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding:28px; min-height:110px; border:2px dashed var(--app-border); border-radius:12px; cursor:pointer;">
+                <MudIcon Icon="@Icons.Material.Filled.UploadFile" Style="color:var(--app-accent);" />
+                <span style="font-size:13px; font-weight:600;">Click to browse</span>
+                <span style="font-size:11.5px; color:var(--app-text-secondary);">PNG or JPG, up to 10MB each</span>
+            </label>
+            <InputFile id="screenshotInput" OnChange="OnFilesSelected" multiple accept="image/*" style="display:none;" />
+
+            @if (_uploadedFiles.Count > 0)
+            {
+                <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:12px;">
+                    @foreach (var file in _uploadedFiles)
+                    {
+                        <div style="display:flex; align-items:center; gap:8px; background:var(--app-surface-variant); border:1px solid var(--app-border); border-radius:8px; padding:6px 8px 6px 10px;">
+                            <span style="font-size:11.5px; color:var(--app-text-secondary);">@file.Name</span>
+                            <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="@(() => RemoveFile(file))" />
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <MudText Typo="Typo.caption" Style="color:var(--app-text-secondary); margin-top:8px; display:block;">No uploaded files.</MudText>
+            }
+        </div>
+
+        <div class="app-card" style="padding:8px 24px 24px;">
+            <MudTabs Rounded="true" ApplyEffectsToContainer="true" TabPanelsClass="pa-4">
+                <MudTabPanel Text="Basic Info">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudDatePicker Label="Date" @bind-Date="_dateAsDateTime" Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudTextField T="string" @bind-Value="_symbol" Label="Symbol" Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudSelect T="EDirection" @bind-Value="_direction" Label="Direction" Variant="Variant.Outlined">
+                                <MudSelectItem Value="EDirection.Long">Long</MudSelectItem>
+                                <MudSelectItem Value="EDirection.Short">Short</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudNumericField T="double?" @bind-Value="_amount" Label="Amount" Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudSelect T="EOutcome" @bind-Value="_outcome" Label="Outcome" Variant="Variant.Outlined">
+                                @foreach (var o in Enum.GetValues<EOutcome>())
+                                {
+                                    <MudSelectItem Value="@o">@o</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudSelect T="ETradeRating" @bind-Value="_rating" Label="Rating" Variant="Variant.Outlined">
+                                <MudSelectItem Value="ETradeRating.APlus">A+</MudSelectItem>
+                                <MudSelectItem Value="ETradeRating.A">A</MudSelectItem>
+                                <MudSelectItem Value="ETradeRating.AMinus">A-</MudSelectItem>
+                                <MudSelectItem Value="ETradeRating.BookOfHorror">Book of Horror</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+
+                <MudTabPanel Text="Prices">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudNumericField T="double?" @bind-Value="_entryPrice" Label="Entry Price" Variant="Variant.Outlined" Format="F2" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudNumericField T="double?" @bind-Value="_stopPrice" Label="Stop Price" Variant="Variant.Outlined" Format="F2" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudNumericField T="double?" @bind-Value="_exitPrice" Label="Exit Price" Variant="Variant.Outlined" Format="F2" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudNumericField T="double?" @bind-Value="_maxPrice" Label="Max Price" Variant="Variant.Outlined" Format="F2" />
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+
+                <MudTabPanel Text="Results">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudNumericField T="double?" @bind-Value="_pnl" Label="P&amp;L" Variant="Variant.Outlined" Format="F2" />
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+
+                <MudTabPanel Text="Strategy">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudSelect T="ECandleType" @bind-Value="_candleType" Label="Candle Type" Variant="Variant.Outlined">
+                                @foreach (var c in Enum.GetValues<ECandleType>())
+                                {
+                                    <MudSelectItem Value="@c">@c</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        @if (_sizeData.Strategy is Strategy.SRS or Strategy.Espresso)
+                        {
+                            <MudItem xs="12" sm="6" md="4" Style="display:flex; align-items:center;">
+                                <MudSwitch T="bool" @bind-Value="_isInOvernightRange" Label="In overnight range" Color="Color.Success" />
+                            </MudItem>
+                        }
+                        <MudItem xs="12" sm="6" md="4" Style="display:flex; align-items:center;">
+                            <MudSwitch T="bool" @bind-Value="_isFlippedSwitch" Label="Flipped the switch" Color="Color.Success" />
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+            </MudTabs>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh" OnClick="ClearForm" Disabled="_saving">Clear</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Save" OnClick="SaveAsync" Disabled="_saving">
+                @(_saving ? "Saving..." : "Save Trade")
+            </MudButton>
+        </div>
+
+    </div>
+</div>

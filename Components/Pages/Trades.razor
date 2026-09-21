@@ -1,0 +1,226 @@
+@page "/trades"
+@rendermode InteractiveServer
+
+<PageTitle>Trades</PageTitle>
+
+<TopBar Title="Trades" />
+
+<div class="app-content">
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Success" />
+}
+else if (_vm is null || CurrentTradeObj is null)
+{
+    <div class="app-card" style="padding:48px; text-align:center;">
+        <MudText Typo="Typo.h6">No trades yet</MudText>
+        <MudText Typo="Typo.body2" Style="color:var(--app-text-secondary); margin-top:6px;">Log your first trade to see it here.</MudText>
+    </div>
+}
+else
+{
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+        <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+            <div style="display:flex; flex-direction:column; gap:3px;">
+                <span style="font-size:10px; font-weight:700; color:var(--app-text-secondary); letter-spacing:.04em;">TRADE</span>
+                <div class="app-nav-counter">
+                    <button @onclick="PrevTrade" disabled="@(_tradeIndex <= 0)"><MudIcon Icon="@Icons.Material.Filled.ChevronLeft" Size="Size.Small" /></button>
+                    <span class="app-nav-counter-value">@(_tradeIndex + 1) / @_vm.AllTradesInSampleSize.Count</span>
+                    <button @onclick="NextTrade" disabled="@(_tradeIndex >= _vm.AllTradesInSampleSize.Count - 1)"><MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" /></button>
+                </div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:3px;">
+                <span style="font-size:10px; font-weight:700; color:var(--app-text-secondary); letter-spacing:.04em;">SAMPLE SIZE</span>
+                <div class="app-nav-counter">
+                    <button @onclick="PrevSampleSize" disabled="@(!CanGoPrevSampleSize)"><MudIcon Icon="@Icons.Material.Filled.ChevronLeft" Size="Size.Small" /></button>
+                    <span class="app-nav-counter-value">@(SampleSizePosition + 1) / @_vm.SampleSizes.Count</span>
+                    <button @onclick="NextSampleSize" disabled="@(!CanGoNextSampleSize)"><MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" /></button>
+                </div>
+            </div>
+            <MudText Typo="Typo.body2" Style="color:var(--app-text-secondary);">@CurrentBase!.Date.ToString("MMM d, yyyy")</MudText>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <MudSelect T="Strategy" Value="_vm.CurrentSampleSize.Strategy" ValueChanged="ChangeStrategy" Dense="true" Variant="Variant.Outlined" Style="min-width:160px;">
+                @foreach (var s in _vm.AvailableStrategies)
+                {
+                    <MudSelectItem Value="@s">Strategy: @MyEnumConverter.StrategyFromEnum(s)</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSelect T="SampleSizeType" Value="_vm.CurrentSampleSize.SampleSizeType" ValueChanged="ChangeType" Dense="true" Variant="Variant.Outlined" Style="min-width:150px;">
+                <MudSelectItem Value="SampleSizeType.Trade">Type: Trade</MudSelectItem>
+                <MudSelectItem Value="SampleSizeType.DemoTrading">Type: Demo Trading</MudSelectItem>
+                <MudSelectItem Value="SampleSizeType.PaperTrade">Type: Paper Trade</MudSelectItem>
+            </MudSelect>
+            <MudSelect T="TimeFrame" Value="_vm.CurrentSampleSize.TimeFrame" ValueChanged="ChangeTimeFrame" Dense="true" Variant="Variant.Outlined" Style="min-width:140px;">
+                @foreach (var tf in _vm.AvailableTimeframes)
+                {
+                    <MudSelectItem Value="@tf">Timeframe: @MyEnumConverter.TimeFrameFromEnum(tf)</MudSelectItem>
+                }
+            </MudSelect>
+        </div>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:20px;">
+
+        <div class="app-card" style="width:100%; padding:16px; display:flex; flex-direction:column; gap:12px;">
+            @if (CurrentBase!.ScreenshotsUrls is { Count: > 0 } urls)
+            {
+                <div style="position:relative; height:78vh; border-radius:12px; overflow:hidden; background:#050a07; border:1px solid var(--app-border);">
+                    <img src="@("/" + urls[_screenshotIndex])" style="display:block; width:100%; height:100%; object-fit:cover;" />
+                    @if (urls.Count > 1)
+                    {
+                        <button class="app-carousel-btn" style="left:14px;" @onclick="PrevScreenshot"><MudIcon Icon="@Icons.Material.Filled.ChevronLeft" /></button>
+                        <button class="app-carousel-btn" style="right:14px;" @onclick="NextScreenshot"><MudIcon Icon="@Icons.Material.Filled.ChevronRight" /></button>
+                        <div style="position:absolute; bottom:10px; left:0; right:0; text-align:center; color:white; font-size:11px; text-shadow:0 1px 2px black;">@(_screenshotIndex + 1) / @urls.Count</div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div style="padding:48px; text-align:center; color:var(--app-text-secondary);">No screenshots for this trade.</div>
+            }
+        </div>
+
+        <div class="app-card" style="width:100%; display:flex; flex-direction:column;">
+            <MudTabs @bind-ActivePanelIndex="_activeTab" Rounded="true" ApplyEffectsToContainer="true" TabPanelsClass="pa-4">
+                <MudTabPanel Text="Trade Data">
+                    <MudTabs Rounded="true" Elevation="0" TabPanelsClass="pt-4">
+                        <MudTabPanel Text="Basic Info">
+                            <MudGrid Spacing="3">
+                                <MudItem xs="12" sm="6"><MudDatePicker Label="Date" Date="CurrentBase.Date.ToDateTime(TimeOnly.MinValue)" DateChanged="@(d => CurrentBase.Date = DateOnly.FromDateTime(d ?? DateTime.Now))" Variant="Variant.Outlined" /></MudItem>
+                                <MudItem xs="12" sm="6"><MudTextField T="string" @bind-Value="CurrentBase.Symbol" Label="Symbol" Variant="Variant.Outlined" /></MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudSelect T="EDirection" @bind-Value="CurrentBase.Direction" Label="Direction" Variant="Variant.Outlined">
+                                        <MudSelectItem Value="EDirection.Long">Long</MudSelectItem>
+                                        <MudSelectItem Value="EDirection.Short">Short</MudSelectItem>
+                                    </MudSelect>
+                                </MudItem>
+                                <MudItem xs="12" sm="6"><MudNumericField T="double?" @bind-Value="CurrentBase.Amount" Label="Amount" Variant="Variant.Outlined" /></MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudSelect T="EOutcome" @bind-Value="CurrentBase.Outcome" Label="Outcome" Variant="Variant.Outlined">
+                                        @foreach (var o in Enum.GetValues<EOutcome>())
+                                        {
+                                            <MudSelectItem Value="@o">@o</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudSelect T="ETradeRating" @bind-Value="CurrentBase.TradeRating" Label="Rating" Variant="Variant.Outlined">
+                                        <MudSelectItem Value="ETradeRating.APlus">A+</MudSelectItem>
+                                        <MudSelectItem Value="ETradeRating.A">A</MudSelectItem>
+                                        <MudSelectItem Value="ETradeRating.AMinus">A-</MudSelectItem>
+                                        <MudSelectItem Value="ETradeRating.BookOfHorror">Book of Horror</MudSelectItem>
+                                    </MudSelect>
+                                </MudItem>
+                            </MudGrid>
+                        </MudTabPanel>
+                        <MudTabPanel Text="Prices">
+                            <MudGrid Spacing="3">
+                                <MudItem xs="12" sm="6" md="3"><MudNumericField T="double?" @bind-Value="CurrentBase.EntryPrice" Label="Entry Price" Variant="Variant.Outlined" Format="F2" /></MudItem>
+                                <MudItem xs="12" sm="6" md="3"><MudNumericField T="double?" @bind-Value="CurrentBase.StopPrice" Label="Stop Price" Variant="Variant.Outlined" Format="F2" /></MudItem>
+                                <MudItem xs="12" sm="6" md="3"><MudNumericField T="double?" @bind-Value="CurrentBase.ExitPrice" Label="Exit Price" Variant="Variant.Outlined" Format="F2" /></MudItem>
+                                <MudItem xs="12" sm="6" md="3"><MudNumericField T="double?" @bind-Value="CurrentBase.MaxPrice" Label="Max Price" Variant="Variant.Outlined" Format="F2" /></MudItem>
+                            </MudGrid>
+                        </MudTabPanel>
+                        <MudTabPanel Text="Results">
+                            <MudGrid Spacing="3">
+                                <MudItem xs="12" sm="6" md="4"><MudNumericField T="double?" @bind-Value="CurrentBase.PnL" Label="P&amp;L" Variant="Variant.Outlined" Format="F2" /></MudItem>
+                            </MudGrid>
+                        </MudTabPanel>
+                    </MudTabs>
+                </MudTabPanel>
+
+                <MudTabPanel Text="Research">
+                    <MudGrid Spacing="3">
+                        @if (AsSRS is not null)
+                        {
+                            <MudItem xs="12" sm="6" md="4">
+                                <MudSelect T="ECandleType" @bind-Value="AsSRS.CandleType" Label="Candle Type" Variant="Variant.Outlined">
+                                    @foreach (var c in Enum.GetValues<ECandleType>())
+                                    {
+                                        <MudSelectItem Value="@c">@c</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            </MudItem>
+                            <MudItem xs="12" sm="6" md="4" Style="display:flex; align-items:center;"><MudSwitch T="bool" @bind-Value="AsSRS.IsInOverNightRange" Label="In overnight range" Color="Color.Success" /></MudItem>
+                            <MudItem xs="12" sm="6" md="4" Style="display:flex; align-items:center;"><MudSwitch T="bool" @bind-Value="AsSRS.IsFlippedTheSwitch" Label="Flipped the switch" Color="Color.Success" /></MudItem>
+                        }
+                        else if (AsBrunchBreak is not null)
+                        {
+                            <MudItem xs="12" sm="6" md="4">
+                                <MudSelect T="ECandleType" @bind-Value="AsBrunchBreak.CandleType" Label="Candle Type" Variant="Variant.Outlined">
+                                    @foreach (var c in Enum.GetValues<ECandleType>())
+                                    {
+                                        <MudSelectItem Value="@c">@c</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            </MudItem>
+                            <MudItem xs="12" sm="6" md="4" Style="display:flex; align-items:center;"><MudSwitch T="bool" @bind-Value="AsBrunchBreak.IsFlippedTheSwitch" Label="Flipped the switch" Color="Color.Success" /></MudItem>
+                        }
+                        else if (AsEspresso is not null)
+                        {
+                            <MudItem xs="12" sm="6" md="4">
+                                <MudSelect T="ECandleType" @bind-Value="AsEspresso.CandleType" Label="Candle Type" Variant="Variant.Outlined">
+                                    @foreach (var c in Enum.GetValues<ECandleType>())
+                                    {
+                                        <MudSelectItem Value="@c">@c</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            </MudItem>
+                            <MudItem xs="12" sm="6" md="4" Style="display:flex; align-items:center;"><MudSwitch T="bool" @bind-Value="AsEspresso.IsInOverNightRange" Label="In overnight range" Color="Color.Success" /></MudItem>
+                            <MudItem xs="12" sm="6" md="4" Style="display:flex; align-items:center;"><MudSwitch T="bool" @bind-Value="AsEspresso.IsFlippedTheSwitch" Label="Flipped the switch" Color="Color.Success" /></MudItem>
+                        }
+                    </MudGrid>
+                </MudTabPanel>
+
+                <MudTabPanel Text="Journal">
+                    @if (CurrentBase.Journal is { } journal)
+                    {
+                        <MudTabs Rounded="true" Elevation="0" TabPanelsClass="pt-4">
+                            <MudTabPanel Text="Pre"><MudTextField T="string" @bind-Value="journal.Pre" Lines="8" Variant="Variant.Outlined" /></MudTabPanel>
+                            <MudTabPanel Text="During"><MudTextField T="string" @bind-Value="journal.During" Lines="8" Variant="Variant.Outlined" /></MudTabPanel>
+                            <MudTabPanel Text="Exit"><MudTextField T="string" @bind-Value="journal.Exit" Lines="8" Variant="Variant.Outlined" /></MudTabPanel>
+                            <MudTabPanel Text="Post"><MudTextField T="string" @bind-Value="journal.Post" Lines="8" Variant="Variant.Outlined" /></MudTabPanel>
+                        </MudTabs>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Style="color:var(--app-text-secondary);">No journal linked to this trade.</MudText>
+                    }
+                </MudTabPanel>
+
+                <MudTabPanel Text="Review">
+                    @if (_vm.CurrentSampleSize.Review is { } review)
+                    {
+                        <MudTabs Rounded="true" Elevation="0" TabPanelsClass="pt-4">
+                            <MudTabPanel Text="First"><MudTextField T="string" @bind-Value="review.First" Lines="8" Variant="Variant.Outlined" /></MudTabPanel>
+                            <MudTabPanel Text="Second"><MudTextField T="string" @bind-Value="review.Second" Lines="8" Variant="Variant.Outlined" /></MudTabPanel>
+                            <MudTabPanel Text="Third"><MudTextField T="string" @bind-Value="review.Third" Lines="8" Variant="Variant.Outlined" /></MudTabPanel>
+                            <MudTabPanel Text="Forth"><MudTextField T="string" @bind-Value="review.Forth" Lines="8" Variant="Variant.Outlined" /></MudTabPanel>
+                            <MudTabPanel Text="Summary"><MudTextField T="string" @bind-Value="review.Summary" Lines="8" Variant="Variant.Outlined" /></MudTabPanel>
+                        </MudTabs>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Style="color:var(--app-text-secondary);">This sample size has no review yet.</MudText>
+                    }
+                </MudTabPanel>
+            </MudTabs>
+
+            <div style="padding:14px 20px 20px; border-top:1px solid var(--app-border); display:flex; gap:8px; flex-wrap:wrap; margin-top:auto;">
+                <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Save" OnClick="UpdateAsync" Disabled="_saving">Update</MudButton>
+
+                <label for="uploadMoreInput">
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Upload" Disabled="_saving" ButtonType="ButtonType.Button">Upload</MudButton>
+                </label>
+                <InputFile id="uploadMoreInput" OnChange="OnUploadMoreScreenshots" multiple accept="image/*" style="display:none;" />
+
+                <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete" OnClick="ConfirmDeleteAsync" Disabled="_saving" Style="margin-left:auto;">Delete</MudButton>
+            </div>
+        </div>
+    </div>
+}
+
+</div>
