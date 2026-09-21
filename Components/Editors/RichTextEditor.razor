@@ -1,0 +1,55 @@
+@* Thin wrapper around Radzen's HTML editor. Fully qualified on purpose: importing the Radzen
+   namespaces globally would collide with MudBlazor types (Variant, Size, ...).
+
+   The toolbar is spelled out (same tools as Radzen's default) only so the font size tool can show a
+   pixel value at rest: unformatted text renders at DefaultFontSizePx, so that is what the dropdown shows
+   until the cursor is in text with an explicit size - then Radzen shows that size (e.g. "13px"). *@
+<div class="rich-text-editor">
+    <Radzen.Blazor.RadzenHtmlEditor Value="@Value" ValueChanged="@ValueChanged" Style="@($"height:{Height}px; width:100%;")">
+        <Radzen.Blazor.RadzenHtmlEditorUndo />
+        <Radzen.Blazor.RadzenHtmlEditorRedo />
+        <Radzen.Blazor.RadzenHtmlEditorSeparator />
+        <Radzen.Blazor.RadzenHtmlEditorBold />
+        <Radzen.Blazor.RadzenHtmlEditorItalic />
+        <Radzen.Blazor.RadzenHtmlEditorUnderline />
+        <Radzen.Blazor.RadzenHtmlEditorStrikeThrough />
+        <Radzen.Blazor.RadzenHtmlEditorSeparator />
+        <Radzen.Blazor.RadzenHtmlEditorAlignLeft />
+        <Radzen.Blazor.RadzenHtmlEditorAlignCenter />
+        <Radzen.Blazor.RadzenHtmlEditorAlignRight />
+        <Radzen.Blazor.RadzenHtmlEditorJustify />
+        <Radzen.Blazor.RadzenHtmlEditorSeparator />
+        <Radzen.Blazor.RadzenHtmlEditorIndent />
+        <Radzen.Blazor.RadzenHtmlEditorOutdent />
+        <Radzen.Blazor.RadzenHtmlEditorUnorderedList />
+        <Radzen.Blazor.RadzenHtmlEditorOrderedList />
+        <Radzen.Blazor.RadzenHtmlEditorSeparator />
+        <Radzen.Blazor.RadzenHtmlEditorColor />
+        <Radzen.Blazor.RadzenHtmlEditorBackground />
+        <Radzen.Blazor.RadzenHtmlEditorRemoveFormat />
+        <Radzen.Blazor.RadzenHtmlEditorSeparator />
+        <Radzen.Blazor.RadzenHtmlEditorSubscript />
+        <Radzen.Blazor.RadzenHtmlEditorSuperscript />
+        <Radzen.Blazor.RadzenHtmlEditorSeparator />
+        <Radzen.Blazor.RadzenHtmlEditorLink />
+        <Radzen.Blazor.RadzenHtmlEditorUnlink />
+        <Radzen.Blazor.RadzenHtmlEditorImage />
+        <Radzen.Blazor.RadzenHtmlEditorTable />
+        <Radzen.Blazor.RadzenHtmlEditorTableTools />
+        <Radzen.Blazor.RadzenHtmlEditorSeparator />
+        <Radzen.Blazor.RadzenHtmlEditorFontName />
+        <Radzen.Blazor.RadzenHtmlEditorFontSize Placeholder="@($"{DefaultFontSizePx}px")" />
+        <Radzen.Blazor.RadzenHtmlEditorFormatBlock />
+        <Radzen.Blazor.RadzenHtmlEditorSeparator />
+        <Radzen.Blazor.RadzenHtmlEditorSource />
+    </Radzen.Blazor.RadzenHtmlEditor>
+</div>
+
+@code {
+    /// <summary>Must match the font-size rule for .rich-text-editor in app.css.</summary>
+    private const int DefaultFontSizePx = 13;
+
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public int Height { get; set; } = 280;
+}

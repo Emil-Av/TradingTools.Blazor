@@ -76,7 +76,7 @@ a:hover {
     padding: 10px 14px;
     border-radius: 10px;
     color: var(--app-text-secondary);
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     cursor: pointer;
 }
@@ -293,4 +293,19 @@ h1:focus {
 #blazor-error-ui .dismiss {
     cursor: pointer;
     float: right;
+}
+
+
+/* MudBlazor drops the divider above and below an expanded panel; keep it so the separators stay visible. */
+.app-expansion .mud-expand-panel.mud-panel-next-expanded,
+.app-expansion .mud-expand-panel.mud-panel-expanded {
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+}
+.app-expansion .mud-expand-panel.mud-panel-expanded:last-child {
+    border-bottom: none;
+}
+
+/* Pin the editor text size so the font size tool's resting value (13px, see RichTextEditor.razor) stays accurate. */
+.rich-text-editor .rz-html-editor-content {
+    font-size: 13px;
 }

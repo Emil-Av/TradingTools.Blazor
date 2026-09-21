@@ -86,50 +86,47 @@ else
         <div class="app-card" style="width:100%; display:flex; flex-direction:column;">
             <MudTabs @bind-ActivePanelIndex="_activeTab" Rounded="true" ApplyEffectsToContainer="true" TabPanelsClass="pa-4">
                 <MudTabPanel Text="Trade Data">
-                    <MudTabs Rounded="true" Elevation="0" TabPanelsClass="pt-4">
-                        <MudTabPanel Text="Basic Info">
-                            <MudGrid Spacing="3">
-                                <MudItem xs="12" sm="6"><MudDatePicker Label="Date" Date="CurrentBase.Date.ToDateTime(TimeOnly.MinValue)" DateChanged="@(d => CurrentBase.Date = DateOnly.FromDateTime(d ?? DateTime.Now))" Variant="Variant.Outlined" /></MudItem>
-                                <MudItem xs="12" sm="6"><MudTextField T="string" @bind-Value="CurrentBase.Symbol" Label="Symbol" Variant="Variant.Outlined" /></MudItem>
-                                <MudItem xs="12" sm="6">
-                                    <MudSelect T="EDirection" @bind-Value="CurrentBase.Direction" Label="Direction" Variant="Variant.Outlined">
-                                        <MudSelectItem Value="EDirection.Long">Long</MudSelectItem>
-                                        <MudSelectItem Value="EDirection.Short">Short</MudSelectItem>
-                                    </MudSelect>
-                                </MudItem>
-                                <MudItem xs="12" sm="6"><MudNumericField T="double?" @bind-Value="CurrentBase.Amount" Label="Amount" Variant="Variant.Outlined" /></MudItem>
-                                <MudItem xs="12" sm="6">
-                                    <MudSelect T="EOutcome" @bind-Value="CurrentBase.Outcome" Label="Outcome" Variant="Variant.Outlined">
-                                        @foreach (var o in Enum.GetValues<EOutcome>())
-                                        {
-                                            <MudSelectItem Value="@o">@o</MudSelectItem>
-                                        }
-                                    </MudSelect>
-                                </MudItem>
-                                <MudItem xs="12" sm="6">
-                                    <MudSelect T="ETradeRating" @bind-Value="CurrentBase.TradeRating" Label="Rating" Variant="Variant.Outlined">
-                                        <MudSelectItem Value="ETradeRating.APlus">A+</MudSelectItem>
-                                        <MudSelectItem Value="ETradeRating.A">A</MudSelectItem>
-                                        <MudSelectItem Value="ETradeRating.AMinus">A-</MudSelectItem>
-                                        <MudSelectItem Value="ETradeRating.BookOfHorror">Book of Horror</MudSelectItem>
-                                    </MudSelect>
-                                </MudItem>
-                            </MudGrid>
-                        </MudTabPanel>
-                        <MudTabPanel Text="Prices">
-                            <MudGrid Spacing="3">
-                                <MudItem xs="12" sm="6" md="3"><MudNumericField T="double?" @bind-Value="CurrentBase.EntryPrice" Label="Entry Price" Variant="Variant.Outlined" Format="F2" /></MudItem>
-                                <MudItem xs="12" sm="6" md="3"><MudNumericField T="double?" @bind-Value="CurrentBase.StopPrice" Label="Stop Price" Variant="Variant.Outlined" Format="F2" /></MudItem>
-                                <MudItem xs="12" sm="6" md="3"><MudNumericField T="double?" @bind-Value="CurrentBase.ExitPrice" Label="Exit Price" Variant="Variant.Outlined" Format="F2" /></MudItem>
-                                <MudItem xs="12" sm="6" md="3"><MudNumericField T="double?" @bind-Value="CurrentBase.MaxPrice" Label="Max Price" Variant="Variant.Outlined" Format="F2" /></MudItem>
-                            </MudGrid>
-                        </MudTabPanel>
-                        <MudTabPanel Text="Results">
-                            <MudGrid Spacing="3">
-                                <MudItem xs="12" sm="6" md="4"><MudNumericField T="double?" @bind-Value="CurrentBase.PnL" Label="P&amp;L" Variant="Variant.Outlined" Format="F2" /></MudItem>
-                            </MudGrid>
-                        </MudTabPanel>
-                    </MudTabs>
+                    <MudText Typo="Typo.overline" Class="mb-2" Style="color:var(--app-text-secondary);">Basic info</MudText>
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" sm="6" md="4"><MudDatePicker Margin="Margin.Dense" Label="Date" Date="CurrentBase.Date.ToDateTime(TimeOnly.MinValue)" DateChanged="@(d => CurrentBase.Date = DateOnly.FromDateTime(d ?? DateTime.Now))" Variant="Variant.Outlined" /></MudItem>
+                        <MudItem xs="12" sm="6" md="4"><MudTextField Margin="Margin.Dense" T="string" @bind-Value="CurrentBase.Symbol" Label="Symbol" Variant="Variant.Outlined" /></MudItem>
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudSelect Margin="Margin.Dense" T="EDirection" @bind-Value="CurrentBase.Direction" Label="Direction" Variant="Variant.Outlined">
+                                <MudSelectItem Value="EDirection.Long">Long</MudSelectItem>
+                                <MudSelectItem Value="EDirection.Short">Short</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="4"><MudNumericField Margin="Margin.Dense" T="double?" @bind-Value="CurrentBase.Amount" Label="Amount" Variant="Variant.Outlined" /></MudItem>
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudSelect Margin="Margin.Dense" T="EOutcome" @bind-Value="CurrentBase.Outcome" Label="Outcome" Variant="Variant.Outlined">
+                                @foreach (var o in Enum.GetValues<EOutcome>())
+                                {
+                                    <MudSelectItem Value="@o">@o</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudSelect Margin="Margin.Dense" T="ETradeRating" @bind-Value="CurrentBase.TradeRating" Label="Rating" Variant="Variant.Outlined">
+                                <MudSelectItem Value="ETradeRating.APlus">A+</MudSelectItem>
+                                <MudSelectItem Value="ETradeRating.A">A</MudSelectItem>
+                                <MudSelectItem Value="ETradeRating.AMinus">A-</MudSelectItem>
+                                <MudSelectItem Value="ETradeRating.BookOfHorror">Book of Horror</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                    </MudGrid>
+                    <MudDivider Class="my-3" />
+                    <MudText Typo="Typo.overline" Class="mb-2" Style="color:var(--app-text-secondary);">Prices</MudText>
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" sm="6" md="3"><MudNumericField Margin="Margin.Dense" T="double?" @bind-Value="CurrentBase.EntryPrice" Label="Entry Price" Variant="Variant.Outlined" Format="F2" /></MudItem>
+                        <MudItem xs="12" sm="6" md="3"><MudNumericField Margin="Margin.Dense" T="double?" @bind-Value="CurrentBase.StopPrice" Label="Stop Price" Variant="Variant.Outlined" Format="F2" /></MudItem>
+                        <MudItem xs="12" sm="6" md="3"><MudNumericField Margin="Margin.Dense" T="double?" @bind-Value="CurrentBase.ExitPrice" Label="Exit Price" Variant="Variant.Outlined" Format="F2" /></MudItem>
+                        <MudItem xs="12" sm="6" md="3"><MudNumericField Margin="Margin.Dense" T="double?" @bind-Value="CurrentBase.MaxPrice" Label="Max Price" Variant="Variant.Outlined" Format="F2" /></MudItem>
+                    </MudGrid>
+                    <MudDivider Class="my-3" />
+                    <MudText Typo="Typo.overline" Class="mb-2" Style="color:var(--app-text-secondary);">Results</MudText>
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" sm="6" md="3"><MudNumericField Margin="Margin.Dense" T="double?" @bind-Value="CurrentBase.PnL" Label="P&amp;L" Variant="Variant.Outlined" Format="F2" /></MudItem>
+                    </MudGrid>
                 </MudTabPanel>
 
                 <MudTabPanel Text="Research">
@@ -178,12 +175,12 @@ else
                 <MudTabPanel Text="Journal">
                     @if (CurrentBase.Journal is { } journal)
                     {
-                        <MudTabs Rounded="true" Elevation="0" TabPanelsClass="pt-4">
-                            <MudTabPanel Text="Pre"><MudTextField T="string" @bind-Value="journal.Pre" Lines="8" Variant="Variant.Outlined" /></MudTabPanel>
-                            <MudTabPanel Text="During"><MudTextField T="string" @bind-Value="journal.During" Lines="8" Variant="Variant.Outlined" /></MudTabPanel>
-                            <MudTabPanel Text="Exit"><MudTextField T="string" @bind-Value="journal.Exit" Lines="8" Variant="Variant.Outlined" /></MudTabPanel>
-                            <MudTabPanel Text="Post"><MudTextField T="string" @bind-Value="journal.Post" Lines="8" Variant="Variant.Outlined" /></MudTabPanel>
-                        </MudTabs>
+                        <MudExpansionPanels MultiExpansion="true" Elevation="0" Class="app-expansion">
+                            <MudExpansionPanel Text="Pre"><RichTextEditor @bind-Value="journal.Pre" /></MudExpansionPanel>
+                            <MudExpansionPanel Text="During"><RichTextEditor @bind-Value="journal.During" /></MudExpansionPanel>
+                            <MudExpansionPanel Text="Exit"><RichTextEditor @bind-Value="journal.Exit" /></MudExpansionPanel>
+                            <MudExpansionPanel Text="Post"><RichTextEditor @bind-Value="journal.Post" /></MudExpansionPanel>
+                        </MudExpansionPanels>
                     }
                     else
                     {
@@ -194,13 +191,13 @@ else
                 <MudTabPanel Text="Review">
                     @if (_vm.CurrentSampleSize.Review is { } review)
                     {
-                        <MudTabs Rounded="true" Elevation="0" TabPanelsClass="pt-4">
-                            <MudTabPanel Text="First"><MudTextField T="string" @bind-Value="review.First" Lines="8" Variant="Variant.Outlined" /></MudTabPanel>
-                            <MudTabPanel Text="Second"><MudTextField T="string" @bind-Value="review.Second" Lines="8" Variant="Variant.Outlined" /></MudTabPanel>
-                            <MudTabPanel Text="Third"><MudTextField T="string" @bind-Value="review.Third" Lines="8" Variant="Variant.Outlined" /></MudTabPanel>
-                            <MudTabPanel Text="Forth"><MudTextField T="string" @bind-Value="review.Forth" Lines="8" Variant="Variant.Outlined" /></MudTabPanel>
-                            <MudTabPanel Text="Summary"><MudTextField T="string" @bind-Value="review.Summary" Lines="8" Variant="Variant.Outlined" /></MudTabPanel>
-                        </MudTabs>
+                        <MudExpansionPanels MultiExpansion="true" Elevation="0" Class="app-expansion">
+                            <MudExpansionPanel Text="First"><RichTextEditor @bind-Value="review.First" /></MudExpansionPanel>
+                            <MudExpansionPanel Text="Second"><RichTextEditor @bind-Value="review.Second" /></MudExpansionPanel>
+                            <MudExpansionPanel Text="Third"><RichTextEditor @bind-Value="review.Third" /></MudExpansionPanel>
+                            <MudExpansionPanel Text="Forth"><RichTextEditor @bind-Value="review.Forth" /></MudExpansionPanel>
+                            <MudExpansionPanel Text="Summary"><RichTextEditor @bind-Value="review.Summary" /></MudExpansionPanel>
+                        </MudExpansionPanels>
                     }
                     else
                     {

@@ -16,6 +16,7 @@ namespace TradingTools.Blazor.Components.Pages
         [Inject] private ITradesService TradesService { get; set; } = default!;
         [Inject] private ISnackbar Snackbar { get; set; } = default!;
         [Inject] private IDialogService DialogService { get; set; } = default!;
+        [Inject] private Ganss.Xss.IHtmlSanitizer HtmlSanitizer { get; set; } = default!;
 
         private const long MaxFileSizeBytes = 10 * 1024 * 1024;
 
@@ -106,6 +107,8 @@ namespace TradingTools.Blazor.Components.Pages
             _loading = false;
         }
 
+        private string? Sanitize(string? html) => string.IsNullOrWhiteSpace(html) ? html : HtmlSanitizer.Sanitize(html);
+
         private async Task UpdateAsync()
         {
             if (_vm is null || CurrentBase is null) return;
@@ -125,10 +128,25 @@ namespace TradingTools.Blazor.Components.Pages
                         });
                         break;
                     case 2:
-                        if (CurrentBase.Journal is { } journal) await TradesService.UpdateJournalAsync(journal);
+                        if (CurrentBase.Journal is { } journal)
+                        {
+                            journal.Pre = Sanitize(journal.Pre);
+                            journal.During = Sanitize(journal.During);
+                            journal.Exit = Sanitize(journal.Exit);
+                            journal.Post = Sanitize(journal.Post);
+                            await TradesService.UpdateJournalAsync(journal);
+                        }
                         break;
                     case 3:
-                        if (_vm.CurrentSampleSize.Review is { } review) await TradesService.UpdateReviewAsync(review);
+                        if (_vm.CurrentSampleSize.Review is { } review)
+                        {
+                            review.First = Sanitize(review.First);
+                            review.Second = Sanitize(review.Second);
+                            review.Third = Sanitize(review.Third);
+                            review.Forth = Sanitize(review.Forth);
+                            review.Summary = Sanitize(review.Summary);
+                            await TradesService.UpdateReviewAsync(review);
+                        }
                         break;
                 }
                 Snackbar.Add("Updated.", Severity.Success);

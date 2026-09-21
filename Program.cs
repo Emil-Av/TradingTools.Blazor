@@ -1,14 +1,20 @@
+using System.Globalization;
 using DataAccess.Data;
 using DataAccess.Repository;
 using DataAccess.Repository.IRepository;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
+using Radzen;
 using Statistics.Interfaces;
 using Statistics.Services;
 using TradingTools.Blazor.Components;
 using TradingTools.Blazor.Services;
 using TradingTools.Blazor.Services.Interfaces;
 using Utilities.Trade;
+
+// Library UI text (e.g. the rich text editor toolbar) follows the UI culture, which otherwise comes from
+// the OS (German). Only the UI culture is pinned, so number/date formatting is left as it was.
+CultureInfo.DefaultThreadCurrentUICulture = new CultureInfo("en-US");
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,6 +31,7 @@ builder.Services.Configure<Microsoft.AspNetCore.SignalR.HubOptions>(options =>
 });
 
 builder.Services.AddMudServices();
+builder.Services.AddRadzenComponents();
 
 ConfigureDatabase(builder);
 AddServices(builder);
@@ -107,6 +114,9 @@ static void AddServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IStatisticsService, StatisticsService>();
     builder.Services.AddScoped<INewTradeService, NewTradeService>();
     builder.Services.AddScoped<ITradesService, TradesService>();
+
+    // Journal/Review text is stored as HTML from the rich text editor - sanitized before saving.
+    builder.Services.AddSingleton<Ganss.Xss.IHtmlSanitizer, Ganss.Xss.HtmlSanitizer>();
 }
 
 static void ConfigureDatabase(WebApplicationBuilder builder)
