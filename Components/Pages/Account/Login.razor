@@ -1,0 +1,92 @@
+@page "/account/login"
+@layout TradingTools.Blazor.Components.Layout.AuthLayout
+@attribute [AllowAnonymous]
+@* No @rendermode: this must stay static SSR so SignInManager can write the auth cookie directly
+   onto the response - that isn't possible once a page is running as an interactive circuit.
+   Mirrors TradingToolsRazor's Pages/Account/Login.cshtml(.cs): same fields, same AccountInputModel,
+   same UserManager/SignInManager checks (IsActive, PasswordSignInAsync), same error message text. *@
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Models.RequestModels
+
+<PageTitle>Login</PageTitle>
+
+<div class="app-auth-card">
+    <div class="app-auth-brand">
+        <div class="app-brand-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 6"></polyline><polyline points="15 6 21 6 21 12"></polyline></svg>
+        </div>
+        <div class="app-brand-name">Trading Tools</div>
+    </div>
+
+    <h1 class="app-auth-title">Welcome Back!</h1>
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="app-auth-alert">@_errorMessage</div>
+    }
+
+    <EditForm Model="Input" FormName="login" OnValidSubmit="LoginUser" method="post">
+        <DataAnnotationsValidator />
+
+        <div class="app-auth-field">
+            <label for="username">Username</label>
+            <InputText id="username" class="app-auth-input" @bind-Value="Input.Username" placeholder="Enter Username..." autofocus />
+            <ValidationMessage For="() => Input.Username" class="app-auth-validation" />
+        </div>
+
+        <div class="app-auth-field">
+            <label for="password">Password</label>
+            <InputText id="password" type="password" class="app-auth-input" @bind-Value="Input.Password" placeholder="Password" />
+            <ValidationMessage For="() => Input.Password" class="app-auth-validation" />
+        </div>
+
+        <div class="app-auth-remember">
+            <InputCheckbox id="rememberMe" @bind-Value="Input.RememberMe" />
+            <label for="rememberMe">Remember Me</label>
+        </div>
+
+        <button type="submit" class="app-btn-primary app-auth-submit">Login</button>
+    </EditForm>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    private AccountInputModel Input { get; set; } = new();
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    private string? _errorMessage;
+
+    [Inject] private UserManager<ApplicationUser> UserManager { get; set; } = default!;
+    [Inject] private SignInManager<ApplicationUser> SignInManager { get; set; } = default!;
+    [Inject] private NavigationManager Nav { get; set; } = default!;
+
+    private async Task LoginUser()
+    {
+        var user = await UserManager.FindByNameAsync(Input.Username);
+        if (user is null)
+        {
+            _errorMessage = "Invalid login attempt.";
+            return;
+        }
+
+        if (!user.IsActive)
+        {
+            _errorMessage = "Your account is not active. Please contact the administrator.";
+            return;
+        }
+
+        var result = await SignInManager.PasswordSignInAsync(Input.Username, Input.Password, Input.RememberMe, lockoutOnFailure: false);
+        if (!result.Succeeded)
+        {
+            _errorMessage = "Invalid login attempt.";
+            return;
+        }
+
+        // forceLoad: a real page reload is needed after sign-in so the rest of the app picks up
+        // the new auth cookie/circuit rather than continuing this static SSR request.
+        Nav.NavigateTo(string.IsNullOrWhiteSpace(ReturnUrl) ? "/" : ReturnUrl, forceLoad: true);
+    }
+}

@@ -1,0 +1,12 @@
+@* MudBlazor's popover/dialog/snackbar/theme providers, scoped per interactive page rather than the
+   shared MainLayout. App.razor deliberately has no ambient @rendermode on <Routes /> (Login.razor needs
+   to stay static SSR so SignInManager can write the auth cookie), so this app uses PER-PAGE
+   interactivity instead of one global interactive boundary. MudBlazor requires these providers to
+   render within that SAME per-page boundary - a copy sitting in the (non-interactive-by-default)
+   MainLayout doesn't count, and popovers/snackbars/dialogs silently do nothing without it.
+   Include <MudProviders /> once at the top of every page that declares @rendermode InteractiveServer
+   and uses any of Snackbar/Dialog/popover-based components (MudSelect, MudMenu, MudDatePicker, ...). *@
+<MudThemeProvider Theme="TradingTools.Blazor.Theme.AppTheme.Theme" IsDarkMode="true" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />

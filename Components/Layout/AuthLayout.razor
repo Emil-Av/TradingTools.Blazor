@@ -1,0 +1,8 @@
+@* Full-page layout with no sidebar/topbar, for pages reached before the user is signed in
+   (mirrors the Razor Pages app's Login.cshtml, which set Layout = null). Plain HTML/CSS only -
+   no MudBlazor here, so the page has nothing to depend on beyond static rendering. *@
+@inherits LayoutComponentBase
+
+<div class="app-auth-page">
+    @Body
+</div>

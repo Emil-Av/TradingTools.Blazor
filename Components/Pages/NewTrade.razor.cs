@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
+using Microsoft.JSInterop;
 using Models.Trades;
 using Models.ViewModels;
 using MudBlazor;
@@ -14,14 +15,15 @@ namespace TradingTools.Blazor.Components.Pages
     {
         [Inject] private INewTradeService NewTradeService { get; set; } = default!;
         [Inject] private ISnackbar Snackbar { get; set; } = default!;
+        [Inject] private IJSRuntime JS { get; set; } = default!;
 
         private const long MaxFileSizeBytes = 10 * 1024 * 1024;
 
-        private SampleSizeViewData _sizeData = new() { Strategy = Strategy.SRS, TimeFrame = TimeFrame.M5, SampleSizeType = SampleSizeType.Trade };
+        private SampleSizeViewData _sizeData = new() { Strategy = Strategy.SRS, TimeFrame = TimeFrame.M15, SampleSizeType = SampleSizeType.DemoTrading };
         private readonly List<IBrowserFile> _uploadedFiles = [];
 
         private DateTime? _dateAsDateTime = DateTime.Now.Date;
-        private string? _symbol;
+        private ESymbol _symbol = ESymbol.DAX;
         private EDirection _direction = EDirection.Long;
         private double? _amount;
         private EOutcome _outcome = EOutcome.Win;
@@ -40,6 +42,10 @@ namespace TradingTools.Blazor.Components.Pages
 
         private bool _saving;
 
+        // See the matching comment in Trades.razor.cs: clicking the drop zone asks JS to click the
+        // hidden <InputFile> directly rather than relying on a <label for="..."> to forward the click.
+        private Task TriggerUpload() => JS.InvokeVoidAsync("triggerFileInputClick", "screenshotInput").AsTask();
+
         private void OnFilesSelected(InputFileChangeEventArgs e)
         {
             foreach (var file in e.GetMultipleFiles(20))
@@ -49,6 +55,30 @@ namespace TradingTools.Blazor.Components.Pages
         }
 
         private void RemoveFile(IBrowserFile file) => _uploadedFiles.Remove(file);
+
+        // SRS is always traded on the 15M chart and Espresso on the 5M chart, so picking either one
+        // sets its matching timeframe, and vice versa. Other timeframes don't imply a strategy.
+        private void OnStrategyChanged(Strategy strategy)
+        {
+            _sizeData.Strategy = strategy;
+            _sizeData.TimeFrame = strategy switch
+            {
+                Strategy.SRS => TimeFrame.M15,
+                Strategy.Espresso => TimeFrame.M5,
+                _ => _sizeData.TimeFrame
+            };
+        }
+
+        private void OnTimeFrameChanged(TimeFrame timeFrame)
+        {
+            _sizeData.TimeFrame = timeFrame;
+            _sizeData.Strategy = timeFrame switch
+            {
+                TimeFrame.M15 => Strategy.SRS,
+                TimeFrame.M5 => Strategy.Espresso,
+                _ => _sizeData.Strategy
+            };
+        }
 
         private async Task SaveAsync()
         {
@@ -71,11 +101,6 @@ namespace TradingTools.Blazor.Components.Pages
                         vm.SRSTrade.CandleType = _candleType;
                         vm.SRSTrade.IsInOverNightRange = _isInOvernightRange;
                         vm.SRSTrade.IsFlippedTheSwitch = _isFlippedSwitch;
-                        break;
-                    case Strategy.BrunchBreak:
-                        vm.BrunchBreakTrade = BuildTrade<BrunchBreak>(date);
-                        vm.BrunchBreakTrade.CandleType = _candleType;
-                        vm.BrunchBreakTrade.IsFlippedTheSwitch = _isFlippedSwitch;
                         break;
                     case Strategy.Espresso:
                         vm.EspressoTrade = BuildTrade<Espresso>(date);
@@ -105,7 +130,9 @@ namespace TradingTools.Blazor.Components.Pages
         private T BuildTrade<T>(DateOnly date) where T : BaseTrade, new() => new()
         {
             Date = date,
-            Symbol = _symbol,
+            // Symbol stays a plain string column (existing free-text values aren't touched), so the
+            // selected enum is saved as its name rather than the underlying int.
+            Symbol = _symbol.ToString(),
             Direction = _direction,
             Amount = _amount,
             Outcome = _outcome,
@@ -122,7 +149,7 @@ namespace TradingTools.Blazor.Components.Pages
         {
             _uploadedFiles.Clear();
             _dateAsDateTime = DateTime.Now.Date;
-            _symbol = null;
+            _symbol = ESymbol.DAX;
             _direction = EDirection.Long;
             _amount = null;
             _outcome = EOutcome.Win;

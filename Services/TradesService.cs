@@ -353,7 +353,12 @@ namespace TradingTools.Blazor.Services
             {
                 foreach (IFormFile file in files)
                 {
-                    string filePath = Path.Combine(destinationPath, file.FileName);
+                    // The browser-supplied file name can contain path separators (either '/' or '\',
+                    // regardless of the server's OS - a Windows client uploading to a Linux server can
+                    // still send one). Path.GetFileName strips any directory portion so the file always
+                    // lands inside destinationPath instead of wherever a crafted name points to.
+                    string safeFileName = Path.GetFileName(file.FileName);
+                    string filePath = Path.Combine(destinationPath, safeFileName);
 
                     using (Stream stream = new FileStream(filePath, FileMode.Create))
                     {

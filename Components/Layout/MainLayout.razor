@@ -1,10 +1,13 @@
 @inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Authorization
 @using TradingTools.Blazor.Theme
+@inject NavigationManager Nav
 
+@* MudBlazor's providers live per-interactive-page (see MudProviders.razor), not here: this layout is
+   used by both static and interactive pages, and providers only work within the render-mode boundary
+   of the components using them. A plain <MudThemeProvider> for CSS variables/fonts on static pages
+   using basic Mud components (MudText, MudIcon, ...) is enough since those don't need the providers. *@
 <MudThemeProvider Theme="AppTheme.Theme" IsDarkMode="true" />
-<MudPopoverProvider />
-<MudDialogProvider />
-<MudSnackbarProvider />
 
 <div class="app-shell">
     <NavMenu />
@@ -18,3 +21,32 @@
     <a href="." class="reload">Reload</a>
     <span class="dismiss">&times;</span>
 </div>
+
+@code {
+    // Mirrors the Razor Pages app's AuthorizeFolder("/") + AllowAnonymousToPage("/Error"): every page
+    // under this (default) layout requires a signed-in user, except the error page. The login page
+    // itself uses AuthLayout instead, so it never goes through this check.
+    //
+    // This runs during OnInitializedAsync rather than as an endpoint-level policy because a global
+    // fallback policy also catches Blazor's own infrastructure endpoints (_framework/blazor.web.js,
+    // the SignalR hub) - see the comment on AddCascadingAuthenticationState() in Program.cs. Throwing
+    // via NavigateTo here aborts rendering before any page content is produced, for both the static
+    // and the interactive-server first render.
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthenticationStateTask is null) return;
+
+        var path = new Uri(Nav.Uri).AbsolutePath;
+        if (path.Equals("/Error", StringComparison.OrdinalIgnoreCase)) return;
+
+        var state = await AuthenticationStateTask;
+        if (state.User.Identity?.IsAuthenticated != true)
+        {
+            var returnUrl = Uri.EscapeDataString(new Uri(Nav.Uri).PathAndQuery);
+            Nav.NavigateTo($"/account/login?ReturnUrl={returnUrl}", forceLoad: true);
+        }
+    }
+}

@@ -1,10 +1,13 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
+using Microsoft.JSInterop;
 using Models.RequestModels;
 using Models.Trades;
 using Models.ViewModels;
 using MudBlazor;
 using Newtonsoft.Json;
+using Shared;
+using Shared.Enums;
 using SharedEnums.Enums;
 using TradingTools.Blazor.Services;
 using TradingTools.Blazor.Services.Interfaces;
@@ -17,6 +20,7 @@ namespace TradingTools.Blazor.Components.Pages
         [Inject] private ISnackbar Snackbar { get; set; } = default!;
         [Inject] private IDialogService DialogService { get; set; } = default!;
         [Inject] private Ganss.Xss.IHtmlSanitizer HtmlSanitizer { get; set; } = default!;
+        [Inject] private IJSRuntime JS { get; set; } = default!;
 
         private const long MaxFileSizeBytes = 10 * 1024 * 1024;
 
@@ -32,6 +36,19 @@ namespace TradingTools.Blazor.Components.Pages
         private SRS? AsSRS => CurrentTradeObj as SRS;
         private BrunchBreak? AsBrunchBreak => CurrentTradeObj as BrunchBreak;
         private Espresso? AsEspresso => CurrentTradeObj as Espresso;
+
+        // Symbol is stored as plain text (existing free-typed values are left alone), so this maps it
+        // to/from the ESymbol select. Older values that don't match one of the 3 options fall back to DAX.
+        private ESymbol CurrentSymbol
+        {
+            get => CurrentBase?.Symbol is { } symbol && MyEnumConverter.SymbolFromString(symbol) is { Success: true } result
+                ? result.Value
+                : ESymbol.DAX;
+            set
+            {
+                if (CurrentBase is not null) CurrentBase.Symbol = value.ToString();
+            }
+        }
 
         private int SampleSizePosition => _vm is null ? 0 : _vm.SampleSizes.FindIndex(s => s.Id == _vm.CurrentSampleSize.Id);
         private bool CanGoPrevSampleSize => SampleSizePosition > 0;
@@ -160,6 +177,11 @@ namespace TradingTools.Blazor.Components.Pages
                 _saving = false;
             }
         }
+
+        // A <label for="..."> wrapping a MudButton doesn't reliably forward its click to the hidden
+        // <InputFile> (a nested interactive element breaks the browser's native label-forwarding), so
+        // the button click asks JS to click the file input directly instead.
+        private Task TriggerUpload() => JS.InvokeVoidAsync("triggerFileInputClick", "uploadMoreInput").AsTask();
 
         private async Task OnUploadMoreScreenshots(InputFileChangeEventArgs e)
         {
