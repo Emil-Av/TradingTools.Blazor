@@ -16,10 +16,16 @@
 </head>
 
 <body>
-    <Routes @rendermode="InteractiveServer" />
+    @* No ambient rendermode here: pages default to static SSR, and Trades.razor/NewTrade.razor opt into
+       @rendermode InteractiveServer themselves. An ambient InteractiveServer here would make EVERY page
+       (including the login page) prerender for interactivity, which starts the HTTP response before a
+       page's event handler runs - fatal for Login.razor, since SignInManager needs to still be able to
+       write the auth cookie header at that point. *@
+    <Routes />
     <script src="_framework/blazor.web.js"></script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
     <script src="_content/Radzen.Blazor/Radzen.Blazor.js"></script>
+    <script src="js/fileUpload.js"></script>
 </body>
 
 </html>

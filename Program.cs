@@ -2,7 +2,9 @@ using System.Globalization;
 using DataAccess.Data;
 using DataAccess.Repository;
 using DataAccess.Repository.IRepository;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Models;
 using MudBlazor.Services;
 using Radzen;
 using Statistics.Interfaces;
@@ -33,12 +35,21 @@ builder.Services.Configure<Microsoft.AspNetCore.SignalR.HubOptions>(options =>
 builder.Services.AddMudServices();
 builder.Services.AddRadzenComponents();
 
+// Mirrors the Razor Pages app's authentication: cookie-based Identity. The login wall itself is
+// enforced in MainLayout (see its OnInitializedAsync) rather than as an endpoint-level fallback
+// policy - a global RequireAuthenticatedUser() fallback also catches Blazor's own infrastructure
+// endpoints (_framework/blazor.web.js, the SignalR hub), which share one endpoint mapping with every
+// page and can't be exempted individually, breaking the app for anonymous visitors.
+builder.Services.AddCascadingAuthenticationState();
+
 ConfigureDatabase(builder);
+ConfigureIdentity(builder);
 AddServices(builder);
 
 var app = builder.Build();
 
 ApplyMigrations(app);
+ApplySymbolDataFix(app);
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
@@ -54,11 +65,22 @@ app.UseHttpsRedirection();
 // MapStaticAssets() alone only knows about files that existed at build/publish time.
 app.UseStaticFiles();
 
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.UseAntiforgery();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+// Plain GET+POST endpoints (not a Razor component) so the topbar's account menu can log out with a
+// real <form> post, exactly like the Razor Pages app's /Account/Logout page did.
+app.MapMethods("/account/logout", ["GET", "POST"], async (SignInManager<ApplicationUser> signInManager) =>
+{
+    await signInManager.SignOutAsync();
+    return Results.LocalRedirect("/account/login");
+});
 
 app.Run();
 
@@ -102,6 +124,66 @@ static void ApplyMigrations(WebApplication app)
             throw;
         }
     }
+}
+
+// One-time data fixup for the ESymbol rename (SP -> US500, see MyEnumConverter.SymbolFromEnum): any
+// trade saved with the old "S&P" free-text/enum value is updated to the new "US500" one. Runs on every
+// startup (Development included, unlike ApplyMigrations) but the WHERE clause makes it a no-op once
+// the affected rows are fixed, so it's safe to leave in place.
+static void ApplySymbolDataFix(WebApplication app)
+{
+    using var scope = app.Services.CreateScope();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    var dbContextFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory>();
+
+    try
+    {
+        using var context = dbContextFactory.CreateDbContext();
+
+        var updated = context.Database.ExecuteSqlRaw(
+            """UPDATE "BaseTrades" SET "Symbol" = 'US500' WHERE "Symbol" = 'S&P'""");
+
+        if (updated > 0)
+        {
+            logger.LogInformation("Updated {Count} trade(s) with Symbol 'S&P' to 'US500'.", updated);
+        }
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "An error occurred while updating the 'S&P' Symbol value to 'US500'.");
+        throw;
+    }
+}
+
+static void ConfigureIdentity(WebApplicationBuilder builder)
+{
+    builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
+    {
+        // Password settings
+        options.Password.RequireDigit = true;
+        options.Password.RequireLowercase = true;
+        options.Password.RequireUppercase = true;
+        options.Password.RequireNonAlphanumeric = false;
+        options.Password.RequiredLength = 6;
+
+        // Lockout settings
+        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
+        options.Lockout.MaxFailedAccessAttempts = 5;
+        options.Lockout.AllowedForNewUsers = true;
+    })
+    .AddEntityFrameworkStores<ApplicationDbContext>()
+    .AddDefaultTokenProviders();
+
+    builder.Services.ConfigureApplicationCookie(options =>
+    {
+        options.Cookie.HttpOnly = true;
+        options.Cookie.IsEssential = true;
+        options.ExpireTimeSpan = TimeSpan.FromDays(30); // Cookie expires after 30 days when RememberMe is checked
+        options.SlidingExpiration = true; // Renew cookie on activity
+        options.LoginPath = "/account/login";
+        options.LogoutPath = "/account/logout";
+        options.AccessDeniedPath = "/account/login";
+    });
 }
 
 static void AddServices(WebApplicationBuilder builder)

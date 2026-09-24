@@ -1,6 +1,8 @@
 @page "/trades"
 @rendermode InteractiveServer
 
+<MudProviders />
+
 <PageTitle>Trades</PageTitle>
 
 <TopBar Title="Trades" />
@@ -89,7 +91,14 @@ else
                     <MudText Typo="Typo.overline" Class="mb-2" Style="color:var(--app-text-secondary);">Basic info</MudText>
                     <MudGrid Spacing="2">
                         <MudItem xs="12" sm="6" md="4"><MudDatePicker Margin="Margin.Dense" Label="Date" Date="CurrentBase.Date.ToDateTime(TimeOnly.MinValue)" DateChanged="@(d => CurrentBase.Date = DateOnly.FromDateTime(d ?? DateTime.Now))" Variant="Variant.Outlined" /></MudItem>
-                        <MudItem xs="12" sm="6" md="4"><MudTextField Margin="Margin.Dense" T="string" @bind-Value="CurrentBase.Symbol" Label="Symbol" Variant="Variant.Outlined" /></MudItem>
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudSelect Margin="Margin.Dense" T="ESymbol" @bind-Value="CurrentSymbol" Label="Symbol" Variant="Variant.Outlined">
+                                @foreach (var s in Enum.GetValues<ESymbol>())
+                                {
+                                    <MudSelectItem Value="@s">@MyEnumConverter.SymbolFromEnum(s)</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
                         <MudItem xs="12" sm="6" md="4">
                             <MudSelect Margin="Margin.Dense" T="EDirection" @bind-Value="CurrentBase.Direction" Label="Direction" Variant="Variant.Outlined">
                                 <MudSelectItem Value="EDirection.Long">Long</MudSelectItem>
@@ -209,9 +218,7 @@ else
             <div style="padding:14px 20px 20px; border-top:1px solid var(--app-border); display:flex; gap:8px; flex-wrap:wrap; margin-top:auto;">
                 <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Save" OnClick="UpdateAsync" Disabled="_saving">Update</MudButton>
 
-                <label for="uploadMoreInput">
-                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Upload" Disabled="_saving" ButtonType="ButtonType.Button">Upload</MudButton>
-                </label>
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Upload" Disabled="_saving" ButtonType="ButtonType.Button" OnClick="TriggerUpload">Upload</MudButton>
                 <InputFile id="uploadMoreInput" OnChange="OnUploadMoreScreenshots" multiple accept="image/*" style="display:none;" />
 
                 <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete" OnClick="ConfirmDeleteAsync" Disabled="_saving" Style="margin-left:auto;">Delete</MudButton>
