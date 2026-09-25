@@ -196,6 +196,7 @@ static void AddServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IStatisticsService, StatisticsService>();
     builder.Services.AddScoped<INewTradeService, NewTradeService>();
     builder.Services.AddScoped<ITradesService, TradesService>();
+    builder.Services.AddScoped<IDashboardService, TradingTools.Blazor.Services.Dashboard.DashboardService>();
 
     // Journal/Review text is stored as HTML from the rich text editor - sanitized before saving.
     builder.Services.AddSingleton<Ganss.Xss.IHtmlSanitizer, Ganss.Xss.HtmlSanitizer>();

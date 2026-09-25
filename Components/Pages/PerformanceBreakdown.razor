@@ -1,0 +1,36 @@
+@using TradingTools.Blazor.Services.Dashboard
+@* One "Performance by ..." card on the dashboard: win rate bar per group plus trade count and net euro. *@
+
+<div class="app-card" style="padding:22px;">
+    <MudText Typo="Typo.subtitle1" Style="font-weight:700; margin-bottom:14px;">@Title</MudText>
+    @if (Rows.Count == 0)
+    {
+        <MudText Typo="Typo.body2" Style="color:var(--app-text-secondary);">No trades.</MudText>
+    }
+    else
+    {
+        <div style="display:flex; flex-direction:column; gap:16px;">
+            @foreach (var row in Rows)
+            {
+                <div>
+                    <div style="display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:6px;">
+                        <span style="font-weight:700;">@row.Name</span>
+                        <span class="app-mono" style="color:var(--app-text-secondary);">@DashboardFormat.Percent(row.WinRate) win rate</span>
+                    </div>
+                    <div style="height:6px; border-radius:999px; background:var(--app-surface-variant);">
+                        <div style="width:@(((row.WinRate ?? 0) * 100).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))%; height:100%; border-radius:999px; background:var(--app-accent);"></div>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size:11.5px; margin-top:6px; color:var(--app-text-secondary);">
+                        <span>@row.Trades @(row.Trades == 1 ? "trade" : "trades") · @(row.Wins)W / @(row.Losses)L</span>
+                        <span class="app-mono" style="font-weight:600; color:@(row.NetEuro < 0 ? "var(--app-error)" : "var(--app-accent)");">@DashboardFormat.SignedEuro(row.NetEuro)</span>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public List<DashboardStats.Breakdown> Rows { get; set; } = [];
+}

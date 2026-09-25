@@ -476,3 +476,12 @@ h1:focus {
     background: var(--app-surface-variant);
     color: var(--app-error);
 }
+
+/* ---------- Dashboard ---------- */
+
+/* Five KPI tiles: as many per row as fit, never narrower than 190px. */
+.app-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 16px;
+}
