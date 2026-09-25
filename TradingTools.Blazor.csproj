@@ -21,6 +21,18 @@
     <PackageReference Include="Radzen.Blazor" Version="11.4.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The test project lives in Tests/ inside this folder; keep its files out of the web project's default globs. -->
+    <Compile Remove="Tests/**" />
+    <Content Remove="Tests/**" />
+    <None Remove="Tests/**" />
+    <EmbeddedResource Remove="Tests/**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="TradingTools.Blazor.Tests" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
