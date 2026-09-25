@@ -1,15 +1,17 @@
-@inject NavigationManager Nav
-
 <div class="app-topbar">
     <div class="app-topbar-title">@Title</div>
     <div style="display:flex; align-items:center; gap:12px;">
         @ChildContent
         @if (ShowNewTradeButton)
         {
-            <button class="app-btn-primary" @onclick="GoToNewTrade">
+            @* A plain anchor rather than a @onclick handler + NavigateTo: TopBar is used on both
+               interactive pages (Trades.razor) and static ones (Dashboard, Calculator, ...), and a
+               Blazor click handler does nothing without an active circuit - a real link works either
+               way, no interactivity required. *@
+            <a href="new-trade" class="app-btn-primary">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v8M8 12h8"></path></svg>
                 New Trade
-            </button>
+            </a>
         }
         <details class="app-account-menu">
             <summary class="app-avatar" title="Account menu">EA</summary>
@@ -34,6 +36,4 @@
     [Parameter] public string Title { get; set; } = string.Empty;
     [Parameter] public bool ShowNewTradeButton { get; set; } = true;
     [Parameter] public RenderFragment? ChildContent { get; set; }
-
-    private void GoToNewTrade() => Nav.NavigateTo("new-trade");
 }
