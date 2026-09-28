@@ -79,7 +79,7 @@
                     <MudChart T="double" ChartType="ChartType.Line" ChartSeries="_equitySeries" ChartLabels="_equityLabels"
                               Width="100%" Height="280px" MatchBoundsToSize="true" ChartOptions="_chartOptions" />
                     <div style="font-size:11.5px; color:var(--app-text-secondary); margin-top:6px;">
-                        Each trade: points &times; volume = euro won or lost.
+                        Each trade: points &times; volume = euro won or lost, add-ons included (each with its own volume).
                         @if (_summary.TradesWithoutResult > 0)
                         {
                             <span>@_summary.TradesWithoutResult trade(s) without points or volume recorded are left out of the money figures.</span>
@@ -118,14 +118,14 @@
                         <MudSelectItem Value="@tf">@MyEnumConverter.TimeFrameFromEnum(Enum.Parse<TimeFrame>(tf))</MudSelectItem>
                     }
                 </MudSelect>
-                <MudSelect T="int" @bind-Value="_filterSampleSizeId" Label="Sample size" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:190px; flex:0 0 auto;">
+                <MudSelect T="int" @bind-Value="_filterSampleSizeId" @bind-Value:after="ResetPage" Label="Sample size" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:190px; flex:0 0 auto;">
                     <MudSelectItem Value="0">All</MudSelectItem>
                     @foreach (var option in SampleSizeOptions)
                     {
                         <MudSelectItem Value="@option.Id">@option.Label</MudSelectItem>
                     }
                 </MudSelect>
-                <MudSelect T="PeriodFilter" @bind-Value="_filterPeriod" Label="Period" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:160px; flex:0 0 auto;">
+                <MudSelect T="PeriodFilter" @bind-Value="_filterPeriod" @bind-Value:after="ResetPage" Label="Period" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:160px; flex:0 0 auto;">
                     @foreach (var period in Enum.GetValues<PeriodFilter>())
                     {
                         <MudSelectItem Value="@period">@PeriodLabel(period)</MudSelectItem>
@@ -133,8 +133,17 @@
                 </MudSelect>
                 @if (_filterPeriod == PeriodFilter.LastXTrades)
                 {
-                    <MudNumericField T="int" @bind-Value="_lastXTrades" Label="X" Min="1" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:100px; flex:0 0 auto;" Immediate="true" />
+                    <MudNumericField T="int" @bind-Value="_lastXTrades" @bind-Value:after="ResetPage" Label="X" Min="1" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:100px; flex:0 0 auto;" Immediate="true" />
                 }
+                @* Each bound limits the other's calendar, so the range can't be entered backwards.
+                   The width sits on a wrapper: a date picker also applies its Style to the calendar
+                   popup, which would squeeze the calendar into the field's width and cut it off. *@
+                <div style="width:160px; flex:0 0 auto;">
+                    <MudDatePicker Culture="AppCulture.DatePicker" @bind-Date="_filterFrom" @bind-Date:after="ResetPage" Label="From" MaxDate="_filterTo" Clearable="true" Editable="true" Margin="Margin.Dense" Variant="Variant.Outlined" />
+                </div>
+                <div style="width:160px; flex:0 0 auto;">
+                    <MudDatePicker Culture="AppCulture.DatePicker" @bind-Date="_filterTo" @bind-Date:after="ResetPage" Label="To" MinDate="_filterFrom" Clearable="true" Editable="true" Margin="Margin.Dense" Variant="Variant.Outlined" />
+                </div>
             </div>
 
             <div style="padding:0 24px 8px; font-size:12px; color:var(--app-text-secondary);">
@@ -143,7 +152,7 @@
                 Net <span class="app-mono" style="color:@(filteredSummary.NetEuro < 0 ? "var(--app-error)" : "var(--app-accent)");">@DashboardFormat.SignedEuro(filteredSummary.NetEuro)</span>
             </div>
 
-            <MudTable T="DashboardTrade" Items="@(Enumerable.Reverse(filtered))" Dense="true" Hover="true" Elevation="0" RowsPerPage="10" Class="app-recent-trades">
+            <MudTable T="DashboardTrade" @bind-CurrentPage="_currentPage" Items="@(Enumerable.Reverse(filtered))" Dense="true" Hover="true" Elevation="0" RowsPerPage="10" Class="app-recent-trades">
                 <HeaderContent>
                     <MudTh>Date</MudTh>
                     <MudTh>Symbol</MudTh>
@@ -163,8 +172,14 @@
                     <MudTd DataLabel="Strategy" Style="color:var(--app-text-secondary);">@MyEnumConverter.StrategyFromEnum(context.Strategy)</MudTd>
                     <MudTd DataLabel="TF" Style="color:var(--app-text-secondary);">@MyEnumConverter.TimeFrameFromEnum(context.TimeFrame)</MudTd>
                     <MudTd DataLabel="Sample" Style="color:var(--app-text-secondary);">#@context.SampleSizeNumber</MudTd>
-                    <MudTd DataLabel="Volume"><span class="app-mono">@(context.Volume is { } v ? DashboardFormat.Number(v) : "—")</span></MudTd>
-                    <MudTd DataLabel="Points"><span class="app-mono">@(context.Points is { } p ? DashboardFormat.SignedPoints(p) : "—")</span></MudTd>
+                    <MudTd DataLabel="Volume">
+                        <span class="app-mono">@(context.Volume is { } v ? DashboardFormat.Number(v) : "—")</span>
+                        @if (context.AddOns.Count > 0)
+                        {
+                            <span class="app-addon-count" title="@context.AddOns.Count add-on@(context.AddOns.Count == 1 ? "" : "s"), included in the points and P&amp;L">+@context.AddOns.Count</span>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Points"><span class="app-mono">@(context.TotalPoints is { } p ? DashboardFormat.SignedPoints(p) : "—")</span></MudTd>
                     <MudTd DataLabel="P&amp;L">
                         @if (context.Euro is { } euro)
                         {

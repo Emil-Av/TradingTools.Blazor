@@ -42,8 +42,9 @@ namespace TradingTools.Blazor.Components.Pages
         private int _filterSampleSizeId; // 0 = all
         private PeriodFilter _filterPeriod = PeriodFilter.AllTime;
         private int _lastXTrades = 20;
-
-        private enum PeriodFilter { AllTime, LastWeek, LastMonth, LastXTrades }
+        private DateTime? _filterFrom;
+        private DateTime? _filterTo;
+        private int _currentPage; // 0-based, bound to the grid's pager
 
         protected override async Task OnInitializedAsync()
         {
@@ -138,20 +139,12 @@ namespace TradingTools.Blazor.Components.Pages
         {
             get
             {
-                var today = DateOnly.FromDateTime(DateTime.Today);
-                IEnumerable<DashboardTrade> trades = _accountTrades
+                var trades = _accountTrades
                     .Where(MatchesStrategyAndTimeFrame)
                     .Where(t => _filterSampleSizeId == 0 || t.SampleSizeId == _filterSampleSizeId);
 
-                trades = _filterPeriod switch
-                {
-                    PeriodFilter.LastWeek => trades.Where(t => t.Date >= today.AddDays(-7)),
-                    PeriodFilter.LastMonth => trades.Where(t => t.Date >= today.AddMonths(-1)),
-                    PeriodFilter.LastXTrades => trades.TakeLast(Math.Max(1, _lastXTrades)),
-                    _ => trades
-                };
-
-                return [.. trades];
+                return [.. RecentTradesFilter.Apply(trades, ToDateOnly(_filterFrom), ToDateOnly(_filterTo),
+                    _filterPeriod, _lastXTrades, DateOnly.FromDateTime(DateTime.Today))];
             }
         }
 
@@ -159,13 +152,19 @@ namespace TradingTools.Blazor.Components.Pages
         {
             _filterStrategy = value;
             DropSampleSizeFilterIfHidden();
+            ResetPage();
         }
 
         private void OnTimeFrameFilterChanged(string value)
         {
             _filterTimeFrame = value;
             DropSampleSizeFilterIfHidden();
+            ResetPage();
         }
+
+        // A filter change starts the grid over at its first page; staying on e.g. page 4 would show
+        // an arbitrary slice of the new result (or nothing, if it has fewer pages).
+        private void ResetPage() => _currentPage = 0;
 
         // A selected sample size that no longer matches the strategy/timeframe filters would silently
         // empty the grid, so fall back to "all sample sizes" instead.
@@ -184,7 +183,12 @@ namespace TradingTools.Blazor.Components.Pages
             _filterSampleSizeId = 0;
             _filterPeriod = PeriodFilter.AllTime;
             _lastXTrades = 20;
+            _filterFrom = null;
+            _filterTo = null;
+            ResetPage();
         }
+
+        private static DateOnly? ToDateOnly(DateTime? date) => date is { } d ? DateOnly.FromDateTime(d) : null;
 
         private static string PeriodLabel(PeriodFilter period) => period switch
         {

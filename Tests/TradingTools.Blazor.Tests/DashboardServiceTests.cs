@@ -1,8 +1,5 @@
-using System.Linq.Expressions;
-using DataAccess.Repository.IRepository;
 using Models;
 using Models.Trades;
-using NSubstitute;
 using Shared.Enums;
 using SharedEnums.Enums;
 using TradingTools.Blazor.Services.Dashboard;
@@ -51,25 +48,8 @@ namespace TradingTools.Blazor.Tests
             return trade;
         }
 
-        private static Task<List<T>> Where<T>(IEnumerable<T> items, Expression<Func<T, bool>>? filter) =>
-            Task.FromResult(filter is null ? items.ToList() : items.Where(filter.Compile()).ToList());
-
-        private static Task<List<DashboardTrade>> Load(IEnumerable<SampleSize> sampleSizes, params BaseTrade[] trades)
-        {
-            var tradeRepository = Substitute.For<IBaseTradeRepository>();
-            tradeRepository.GetAllAsync(Arg.Any<Expression<Func<BaseTrade, bool>>?>(), Arg.Any<string?>())
-                .Returns(call => Where(trades, call.ArgAt<Expression<Func<BaseTrade, bool>>?>(0)));
-
-            var sampleSizeRepository = Substitute.For<ISampleSizeRepository>();
-            sampleSizeRepository.GetAllAsync(Arg.Any<Expression<Func<SampleSize, bool>>?>(), Arg.Any<string?>())
-                .Returns(call => Where(sampleSizes, call.ArgAt<Expression<Func<SampleSize, bool>>?>(0)));
-
-            var unitOfWork = Substitute.For<IUnitOfWork>();
-            unitOfWork.BaseTrade.Returns(tradeRepository);
-            unitOfWork.SampleSize.Returns(sampleSizeRepository);
-
-            return new DashboardService(unitOfWork).GetTradesAsync();
-        }
+        private static Task<List<DashboardTrade>> Load(IEnumerable<SampleSize> sampleSizes, params BaseTrade[] trades) =>
+            new DashboardService(TestUnitOfWork.Create(sampleSizes, trades)).GetTradesAsync();
 
         [Fact]
         public async Task Only_closed_srs_and_espresso_trades_outside_research_are_included()

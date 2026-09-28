@@ -1,0 +1,106 @@
+@page "/validation"
+@rendermode InteractiveServer
+@implements IDisposable
+@using System.Globalization
+@using TradingTools.Blazor.Services.Validation
+
+<MudProviders />
+
+<PageTitle>Data check</PageTitle>
+
+<TopBar Title="Data check" />
+
+<div class="app-content">
+
+    <div style="display:flex; align-items:flex-end; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+        <div>
+            <MudText Typo="Typo.h5" Style="font-weight:800;">Data check</MudText>
+            <MudText Typo="Typo.body2" Style="color:var(--app-text-secondary); margin-top:4px;">
+                Every trade is checked in the background after each change: all Trade Data and Research fields filled,
+                exit price on the right side of the entry for the direction and outcome, and P&amp;L = |exit − entry| in points.
+            </MudText>
+        </div>
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh" OnClick="Monitor.RequestValidation" Disabled="Monitor.IsRunning">
+            @(Monitor.IsRunning ? "Checking…" : "Check now")
+        </MudButton>
+    </div>
+
+    @if (Monitor.LastError is { } error)
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">The last check failed: @error</MudAlert>
+    }
+
+    @if (Monitor.LatestReport is not { } report)
+    {
+        <div class="app-card" style="padding:32px; display:flex; align-items:center; gap:14px;">
+            <MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Success" />
+            <MudText Typo="Typo.body2">Checking your trades…</MudText>
+        </div>
+    }
+    else
+    {
+        <MudText Typo="Typo.body2" Style="color:var(--app-text-secondary);">
+            Last checked @report.CompletedAtUtc.ToLocalTime().ToString("HH:mm:ss", CultureInfo.InvariantCulture) ·
+            @report.TradesChecked trades checked ·
+            @if (report.SkippedTradeId is not null)
+            {
+                <span>the most recent trade is skipped as it may still be in progress</span>
+            }
+        </MudText>
+
+        @if (report.InvalidTrades.Count == 0)
+        {
+            <div class="app-card" style="padding:32px; display:flex; align-items:center; gap:14px;">
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Style="color:var(--app-accent);" />
+                <MudText Typo="Typo.body1" Style="font-weight:600;">All trades are valid.</MudText>
+            </div>
+        }
+        else
+        {
+            <MudText Typo="Typo.subtitle1" Style="font-weight:700;">
+                @report.InvalidTrades.Count @(report.InvalidTrades.Count == 1 ? "trade needs" : "trades need") attention
+            </MudText>
+
+            <div style="display:flex; flex-direction:column; gap:12px;">
+                @* Newest first: the trades you're most likely still working on. *@
+                @foreach (var trade in report.InvalidTrades.Reverse())
+                {
+                    <div class="app-card app-invalid-trade">
+                        <div class="app-invalid-trade-header">
+                            <div>
+                                <div style="font-weight:700;">
+                                    @MyEnumConverter.StrategyFromEnum(trade.Strategy) · @MyEnumConverter.TimeFrameFromEnum(trade.TimeFrame) · @MyEnumConverter.TradeTypeFromEnum(trade.AccountType)
+                                </div>
+                                <div style="font-size:12.5px; color:var(--app-text-secondary); margin-top:2px;">
+                                    Sample size @trade.SampleSizeNumber · Trade @trade.TradeNumber ·
+                                    @trade.Date.ToString("dd MMM yyyy", CultureInfo.InvariantCulture) · @trade.Symbol
+                                </div>
+                            </div>
+                            <a class="app-btn-primary" href="@($"trades?tradeId={trade.TradeId}")">
+                                <MudIcon Icon="@Icons.Material.Filled.Edit" Size="Size.Small" /> Open trade
+                            </a>
+                        </div>
+                        <ul class="app-invalid-trade-issues">
+                            @foreach (var issue in trade.Issues)
+                            {
+                                <li>@issue.Message</li>
+                            }
+                        </ul>
+                    </div>
+                }
+            </div>
+        }
+    }
+
+</div>
+
+@code {
+    [Inject] private ITradeValidationMonitor Monitor { get; set; } = default!;
+
+    protected override void OnInitialized() => Monitor.Changed += OnMonitorChanged;
+
+    // Raised on the validation worker's thread.
+    private void OnMonitorChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Monitor.Changed -= OnMonitorChanged;
+}

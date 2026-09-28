@@ -8,6 +8,7 @@ using Shared.Enums;
 using SharedEnums.Enums;
 using TradingTools.Blazor.Services;
 using TradingTools.Blazor.Services.Interfaces;
+using TradingTools.Blazor.Services.Validation;
 
 namespace TradingTools.Blazor.Components.Pages
 {
@@ -36,6 +37,8 @@ namespace TradingTools.Blazor.Components.Pages
 
         private double? _pnl;
 
+        private readonly List<TradeAddOn> _addOns = [];
+
         private ECandleType _candleType = ECandleType.Bullish;
         private bool _isInOvernightRange;
         private bool _isFlippedSwitch;
@@ -45,6 +48,34 @@ namespace TradingTools.Blazor.Components.Pages
         // See the matching comment in Trades.razor.cs: clicking the drop zone asks JS to click the
         // hidden <InputFile> directly rather than relying on a <label for="..."> to forward the click.
         private Task TriggerUpload() => JS.InvokeVoidAsync("triggerFileInputClick", "screenshotInput").AsTask();
+
+        // Same rule as the Trades page: P&L = |exit - entry| in points, filled in once both prices are there.
+        private void OnEntryPriceChanged(double? value)
+        {
+            _entryPrice = value;
+            _pnl = TradePnl.Points(_entryPrice, _exitPrice) ?? _pnl;
+        }
+
+        private void OnExitPriceChanged(double? value)
+        {
+            _exitPrice = value;
+            _pnl = TradePnl.Points(_entryPrice, _exitPrice) ?? _pnl;
+        }
+
+        // A new add-on starts with the trade's exit price: usually the whole position is closed at once.
+        private void AddAddOn() => _addOns.Add(new TradeAddOn { ExitPrice = _exitPrice });
+
+        private static void OnAddOnEntryChanged(TradeAddOn addOn, double? value)
+        {
+            addOn.EntryPrice = value;
+            addOn.PnL = TradePnl.Points(addOn.EntryPrice, addOn.ExitPrice) ?? addOn.PnL;
+        }
+
+        private static void OnAddOnExitChanged(TradeAddOn addOn, double? value)
+        {
+            addOn.ExitPrice = value;
+            addOn.PnL = TradePnl.Points(addOn.EntryPrice, addOn.ExitPrice) ?? addOn.PnL;
+        }
 
         private void OnFilesSelected(InputFileChangeEventArgs e)
         {
@@ -143,6 +174,8 @@ namespace TradingTools.Blazor.Components.Pages
             MaxPrice = _maxPrice,
             PnL = _pnl,
             Status = EStatus.Closed,
+            // Saved with the trade (EF inserts them along with it and sets their trade id).
+            AddOns = [.. _addOns],
         };
 
         private void ClearForm()
@@ -159,6 +192,7 @@ namespace TradingTools.Blazor.Components.Pages
             _exitPrice = null;
             _maxPrice = null;
             _pnl = null;
+            _addOns.Clear();
             _candleType = ECandleType.Bullish;
             _isInOvernightRange = false;
             _isFlippedSwitch = false;

@@ -74,7 +74,7 @@
                 <MudTabPanel Text="Basic Info">
                     <MudGrid Spacing="3">
                         <MudItem xs="12" sm="6" md="4">
-                            <MudDatePicker Label="Date" @bind-Date="_dateAsDateTime" Variant="Variant.Outlined" />
+                            <MudDatePicker Culture="AppCulture.DatePicker" Label="Date" @bind-Date="_dateAsDateTime" Variant="Variant.Outlined" />
                         </MudItem>
                         <MudItem xs="12" sm="6" md="4">
                             <MudSelect T="ESymbol" @bind-Value="_symbol" Label="Symbol" Variant="Variant.Outlined">
@@ -115,13 +115,13 @@
                 <MudTabPanel Text="Prices">
                     <MudGrid Spacing="3">
                         <MudItem xs="12" sm="6" md="3">
-                            <MudNumericField T="double?" @bind-Value="_entryPrice" Label="Entry Price" Variant="Variant.Outlined" Format="F2" />
+                            <MudNumericField T="double?" Value="_entryPrice" ValueChanged="OnEntryPriceChanged" Immediate="true" Label="Entry Price" Variant="Variant.Outlined" Format="F2" />
                         </MudItem>
                         <MudItem xs="12" sm="6" md="3">
                             <MudNumericField T="double?" @bind-Value="_stopPrice" Label="Stop Price" Variant="Variant.Outlined" Format="F2" />
                         </MudItem>
                         <MudItem xs="12" sm="6" md="3">
-                            <MudNumericField T="double?" @bind-Value="_exitPrice" Label="Exit Price" Variant="Variant.Outlined" Format="F2" />
+                            <MudNumericField T="double?" Value="_exitPrice" ValueChanged="OnExitPriceChanged" Immediate="true" Label="Exit Price" Variant="Variant.Outlined" Format="F2" />
                         </MudItem>
                         <MudItem xs="12" sm="6" md="3">
                             <MudNumericField T="double?" @bind-Value="_maxPrice" Label="Max Price" Variant="Variant.Outlined" Format="F2" />
@@ -132,9 +132,33 @@
                 <MudTabPanel Text="Results">
                     <MudGrid Spacing="3">
                         <MudItem xs="12" sm="6" md="4">
-                            <MudNumericField T="double?" @bind-Value="_pnl" Label="P&amp;L" Variant="Variant.Outlined" Format="F2" />
+                            <MudNumericField T="double?" @bind-Value="_pnl" Label="P&amp;L (points)" HelperText="Filled in from |exit − entry|" Variant="Variant.Outlined" Format="F2" />
                         </MudItem>
                     </MudGrid>
+                </MudTabPanel>
+
+                <MudTabPanel Text="@(_addOns.Count == 0 ? "Add-ons" : $"Add-ons ({_addOns.Count})")">
+                    <div style="display:flex; align-items:center; justify-content:space-between;" class="mb-3">
+                        <MudText Typo="Typo.body2" Style="color:var(--app-text-secondary);">Each time you added to the position while the trade was open. The max price only applies to the original trade.</MudText>
+                        <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AddAddOn" Style="flex:0 0 auto;">Add add-on</MudButton>
+                    </div>
+                    @if (_addOns.Count == 0)
+                    {
+                        <MudText Typo="Typo.caption" Style="color:var(--app-text-secondary);">No add-ons.</MudText>
+                    }
+                    @for (int i = 0; i < _addOns.Count; i++)
+                    {
+                        int index = i;
+                        var addOn = _addOns[index];
+                        <div class="app-addon-row" @key="addOn">
+                            <div class="app-addon-number">#@(index + 1)</div>
+                            <MudNumericField T="double?" Value="addOn.EntryPrice" ValueChanged="@(v => OnAddOnEntryChanged(addOn, v))" Immediate="true" Label="Entry Price" Variant="Variant.Outlined" Format="F2" />
+                            <MudNumericField T="double?" Value="addOn.ExitPrice" ValueChanged="@(v => OnAddOnExitChanged(addOn, v))" Immediate="true" Label="Exit Price" Variant="Variant.Outlined" Format="F2" />
+                            <MudNumericField T="double?" @bind-Value="addOn.Volume" Label="Volume" Variant="Variant.Outlined" />
+                            <MudNumericField T="double?" @bind-Value="addOn.PnL" Label="P&amp;L (points)" HelperText="Filled in from |exit − entry|" Variant="Variant.Outlined" Format="F2" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" aria-label="Remove add-on" Style="margin-top:10px;" OnClick="@(() => _addOns.Remove(addOn))" />
+                        </div>
+                    }
                 </MudTabPanel>
 
                 <MudTabPanel Text="Strategy">

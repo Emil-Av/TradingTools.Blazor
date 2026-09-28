@@ -2,6 +2,7 @@ using DataAccess.Repository.IRepository;
 using Models.Trades;
 using Shared.Enums;
 using SharedEnums.Enums;
+using TradingTools.Blazor.Services.AddOns;
 using TradingTools.Blazor.Services.Interfaces;
 
 namespace TradingTools.Blazor.Services.Dashboard
@@ -16,19 +17,15 @@ namespace TradingTools.Blazor.Services.Dashboard
                 t => t.Status == EStatus.Closed
                      && (t.SampleSize!.Strategy == Strategy.SRS || t.SampleSize.Strategy == Strategy.Espresso)
                      && t.SampleSize.SampleSizeType != SampleSizeType.Research,
-                includeProperties: "SampleSize");
+                includeProperties: "SampleSize," + TradeAddOns.Include);
 
             var sampleSizes = await _unitOfWork.SampleSize.GetAllAsync(
                 s => (s.Strategy == Strategy.SRS || s.Strategy == Strategy.Espresso)
                      && s.SampleSizeType != SampleSizeType.Research);
 
-            // "Sample size #n" as shown on the Trades page: position among ALL sample sizes of the
-            // same account type, strategy and timeframe - numbered from the sample sizes themselves,
-            // not from the trades above, so one whose trades are all still open keeps its place.
-            var sampleSizeNumbers = sampleSizes
-                .GroupBy(s => (s.SampleSizeType, s.Strategy, s.TimeFrame))
-                .SelectMany(group => group.OrderBy(s => s.Id).Select((s, index) => (s.Id, Number: index + 1)))
-                .ToDictionary(x => x.Id, x => x.Number);
+            // Numbered from the sample sizes themselves, not from the trades above, so one whose
+            // trades are all still open keeps its place.
+            var sampleSizeNumbers = SampleSizeNumbering.Number(sampleSizes);
 
             return [.. trades
                 .OrderBy(t => t.Date).ThenBy(t => t.CreatedAt).ThenBy(t => t.Id)
@@ -45,7 +42,12 @@ namespace TradingTools.Blazor.Services.Dashboard
                     sampleSizeNumbers[t.SampleSizeId],
                     t.Amount,
                     SignedPoints(t),
-                    t.Outcome))];
+                    t.Outcome)
+                {
+                    AddOns = [.. t.AddOns
+                        .OrderBy(a => a.Id)
+                        .Select(a => new DashboardAddOn(TradeAddOns.SignedPoints(a, t.Direction), a.Volume))]
+                })];
         }
 
         /// <summary>

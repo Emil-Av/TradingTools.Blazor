@@ -86,16 +86,34 @@ else
         </div>
 
         <div class="app-card" style="width:100%; display:flex; flex-direction:column;">
+            @if (CurrentIssues is { Count: > 0 } issues)
+            {
+                @* The most recent trade may still be in progress, so its gaps are informational only. *@
+                <MudAlert Severity="@(CurrentIsMostRecentTrade ? Severity.Info : Severity.Warning)" Variant="Variant.Outlined" Dense="true" Class="ma-4 mb-0">
+                    <div style="font-weight:700; margin-bottom:4px;">
+                        @(CurrentIsMostRecentTrade
+                            ? "Most recent trade - still to be completed:"
+                            : $"This trade has {issues.Count} problem{(issues.Count == 1 ? "" : "s")}:")
+                    </div>
+                    <ul style="margin:0; padding-left:18px;">
+                        @foreach (var issue in issues)
+                        {
+                            <li>@issue.Message</li>
+                        }
+                    </ul>
+                </MudAlert>
+            }
             <MudTabs @bind-ActivePanelIndex="_activeTab" Rounded="true" ApplyEffectsToContainer="true" TabPanelsClass="pa-4">
                 <MudTabPanel Text="Trade Data">
                     <MudText Typo="Typo.overline" Class="mb-2" Style="color:var(--app-text-secondary);">Basic info</MudText>
                     <MudGrid Spacing="2">
-                        <MudItem xs="12" sm="6" md="4"><MudDatePicker Margin="Margin.Dense" Label="Date" Date="CurrentBase.Date.ToDateTime(TimeOnly.MinValue)" DateChanged="@(d => CurrentBase.Date = DateOnly.FromDateTime(d ?? DateTime.Now))" Variant="Variant.Outlined" /></MudItem>
+                        <MudItem xs="12" sm="6" md="4"><MudDatePicker Culture="AppCulture.DatePicker" Margin="Margin.Dense" Label="Date" Date="CurrentBase.Date.ToDateTime(TimeOnly.MinValue)" DateChanged="@(d => CurrentBase.Date = DateOnly.FromDateTime(d ?? DateTime.Now))" Variant="Variant.Outlined" /></MudItem>
                         <MudItem xs="12" sm="6" md="4">
-                            <MudSelect Margin="Margin.Dense" T="ESymbol" @bind-Value="CurrentSymbol" Label="Symbol" Variant="Variant.Outlined">
+                            <MudSelect Margin="Margin.Dense" T="ESymbol?" @bind-Value="CurrentSymbol" Label="Symbol" Variant="Variant.Outlined"
+                                       Error="@(IssueFor(nameof(BaseTrade.Symbol)) is not null)" ErrorText="@IssueFor(nameof(BaseTrade.Symbol))">
                                 @foreach (var s in Enum.GetValues<ESymbol>())
                                 {
-                                    <MudSelectItem Value="@s">@MyEnumConverter.SymbolFromEnum(s)</MudSelectItem>
+                                    <MudSelectItem T="ESymbol?" Value="@s">@MyEnumConverter.SymbolFromEnum(s)</MudSelectItem>
                                 }
                             </MudSelect>
                         </MudItem>
@@ -105,7 +123,8 @@ else
                                 <MudSelectItem Value="EDirection.Short">Short</MudSelectItem>
                             </MudSelect>
                         </MudItem>
-                        <MudItem xs="12" sm="6" md="4"><MudNumericField Margin="Margin.Dense" T="double?" @bind-Value="CurrentBase.Amount" Label="Amount" Variant="Variant.Outlined" /></MudItem>
+                        <MudItem xs="12" sm="6" md="4"><MudNumericField Margin="Margin.Dense" T="double?" @bind-Value="CurrentBase.Amount" Label="Amount" Variant="Variant.Outlined"
+                                                                         Error="@(IssueFor(nameof(BaseTrade.Amount)) is not null)" ErrorText="@IssueFor(nameof(BaseTrade.Amount))" /></MudItem>
                         <MudItem xs="12" sm="6" md="4">
                             <MudSelect Margin="Margin.Dense" T="EOutcome" @bind-Value="CurrentBase.Outcome" Label="Outcome" Variant="Variant.Outlined">
                                 @foreach (var o in Enum.GetValues<EOutcome>())
@@ -126,16 +145,58 @@ else
                     <MudDivider Class="my-3" />
                     <MudText Typo="Typo.overline" Class="mb-2" Style="color:var(--app-text-secondary);">Prices</MudText>
                     <MudGrid Spacing="2">
-                        <MudItem xs="12" sm="6" md="3"><MudNumericField Margin="Margin.Dense" T="double?" @bind-Value="CurrentBase.EntryPrice" Label="Entry Price" Variant="Variant.Outlined" Format="F2" /></MudItem>
-                        <MudItem xs="12" sm="6" md="3"><MudNumericField Margin="Margin.Dense" T="double?" @bind-Value="CurrentBase.StopPrice" Label="Stop Price" Variant="Variant.Outlined" Format="F2" /></MudItem>
-                        <MudItem xs="12" sm="6" md="3"><MudNumericField Margin="Margin.Dense" T="double?" @bind-Value="CurrentBase.ExitPrice" Label="Exit Price" Variant="Variant.Outlined" Format="F2" /></MudItem>
-                        <MudItem xs="12" sm="6" md="3"><MudNumericField Margin="Margin.Dense" T="double?" @bind-Value="CurrentBase.MaxPrice" Label="Max Price" Variant="Variant.Outlined" Format="F2" /></MudItem>
+                        @* Entry and exit recalculate the P&L as they're typed. *@
+                        <MudItem xs="12" sm="6" md="3"><MudNumericField Margin="Margin.Dense" T="double?" Value="CurrentBase.EntryPrice" ValueChanged="OnEntryPriceChanged" Immediate="true" Label="Entry Price" Variant="Variant.Outlined" Format="F2"
+                                                                         Error="@(IssueFor(nameof(BaseTrade.EntryPrice)) is not null)" ErrorText="@IssueFor(nameof(BaseTrade.EntryPrice))" /></MudItem>
+                        <MudItem xs="12" sm="6" md="3"><MudNumericField Margin="Margin.Dense" T="double?" @bind-Value="CurrentBase.StopPrice" Label="Stop Price" Variant="Variant.Outlined" Format="F2"
+                                                                         Error="@(IssueFor(nameof(BaseTrade.StopPrice)) is not null)" ErrorText="@IssueFor(nameof(BaseTrade.StopPrice))" /></MudItem>
+                        <MudItem xs="12" sm="6" md="3"><MudNumericField Margin="Margin.Dense" T="double?" Value="CurrentBase.ExitPrice" ValueChanged="OnExitPriceChanged" Immediate="true" Label="Exit Price" Variant="Variant.Outlined" Format="F2"
+                                                                         Error="@(IssueFor(nameof(BaseTrade.ExitPrice)) is not null)" ErrorText="@IssueFor(nameof(BaseTrade.ExitPrice))" /></MudItem>
+                        <MudItem xs="12" sm="6" md="3"><MudNumericField Margin="Margin.Dense" T="double?" @bind-Value="CurrentBase.MaxPrice" Label="Max Price" Variant="Variant.Outlined" Format="F2"
+                                                                         Error="@(IssueFor(nameof(BaseTrade.MaxPrice)) is not null)" ErrorText="@IssueFor(nameof(BaseTrade.MaxPrice))" /></MudItem>
                     </MudGrid>
                     <MudDivider Class="my-3" />
                     <MudText Typo="Typo.overline" Class="mb-2" Style="color:var(--app-text-secondary);">Results</MudText>
                     <MudGrid Spacing="2">
-                        <MudItem xs="12" sm="6" md="3"><MudNumericField Margin="Margin.Dense" T="double?" @bind-Value="CurrentBase.PnL" Label="P&amp;L" Variant="Variant.Outlined" Format="F2" /></MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudNumericField Margin="Margin.Dense" T="double?" @bind-Value="CurrentBase.PnL" Label="P&amp;L (points)" Variant="Variant.Outlined" Format="F2"
+                                             HelperText="Filled in from |exit − entry|"
+                                             Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Calculate" AdornmentAriaLabel="Recalculate from entry and exit" OnAdornmentClick="RecalculatePnl"
+                                             Error="@(IssueFor(nameof(BaseTrade.PnL)) is not null)" ErrorText="@IssueFor(nameof(BaseTrade.PnL))" />
+                        </MudItem>
                     </MudGrid>
+                    <MudDivider Class="my-3" />
+                    <div style="display:flex; align-items:center; justify-content:space-between;" class="mb-2">
+                        <MudText Typo="Typo.overline" Style="color:var(--app-text-secondary);">Add-ons</MudText>
+                        <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AddAddOn">Add add-on</MudButton>
+                    </div>
+                    @if (CurrentBase.AddOns.Count == 0)
+                    {
+                        <MudText Typo="Typo.caption" Style="color:var(--app-text-secondary);">No add-ons. Add one for each time you added to the position while the trade was open.</MudText>
+                    }
+                    @* A for loop with a copied index: each row's field names ("AddOns[1].ExitPrice") come from its position. *@
+                    @for (int i = 0; i < CurrentBase.AddOns.Count; i++)
+                    {
+                        int index = i;
+                        var addOn = CurrentBase.AddOns[index];
+                        <div class="app-addon-row" @key="addOn">
+                            <div class="app-addon-number">#@(index + 1)</div>
+                            <MudNumericField Margin="Margin.Dense" T="double?" Value="addOn.EntryPrice" ValueChanged="@(v => OnAddOnEntryChanged(addOn, v))" Immediate="true" Label="Entry Price" Variant="Variant.Outlined" Format="F2"
+                                             Error="@(AddOnIssue(index, nameof(TradeAddOn.EntryPrice)) is not null)" ErrorText="@AddOnIssue(index, nameof(TradeAddOn.EntryPrice))" />
+                            <MudNumericField Margin="Margin.Dense" T="double?" Value="addOn.ExitPrice" ValueChanged="@(v => OnAddOnExitChanged(addOn, v))" Immediate="true" Label="Exit Price" Variant="Variant.Outlined" Format="F2"
+                                             Error="@(AddOnIssue(index, nameof(TradeAddOn.ExitPrice)) is not null)" ErrorText="@AddOnIssue(index, nameof(TradeAddOn.ExitPrice))" />
+                            <MudNumericField Margin="Margin.Dense" T="double?" @bind-Value="addOn.Volume" Label="Volume" Variant="Variant.Outlined"
+                                             Error="@(AddOnIssue(index, nameof(TradeAddOn.Volume)) is not null)" ErrorText="@AddOnIssue(index, nameof(TradeAddOn.Volume))" />
+                            <MudNumericField Margin="Margin.Dense" T="double?" @bind-Value="addOn.PnL" Label="P&amp;L (points)" Variant="Variant.Outlined" Format="F2"
+                                             Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Calculate" AdornmentAriaLabel="Recalculate from entry and exit" OnAdornmentClick="@(() => RecalculateAddOnPnl(addOn))"
+                                             Error="@(AddOnIssue(index, nameof(TradeAddOn.PnL)) is not null)" ErrorText="@AddOnIssue(index, nameof(TradeAddOn.PnL))" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" aria-label="Remove add-on" Style="margin-top:6px;" OnClick="@(() => RemoveAddOn(addOn))" />
+                        </div>
+                    }
+                    @if (CurrentBase.AddOns.Count > 0)
+                    {
+                        <MudText Typo="Typo.caption" Style="color:var(--app-text-secondary);">Add-ons are saved with the Update button, together with the rest of the trade data.</MudText>
+                    }
                 </MudTabPanel>
 
                 <MudTabPanel Text="Research">

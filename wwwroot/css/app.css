@@ -485,3 +485,123 @@ h1:focus {
     grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
     gap: 16px;
 }
+
+/* ---------- Data check / Backup ---------- */
+
+.app-nav-badge {
+    margin-left: auto;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--app-error) 20%, transparent);
+    color: var(--app-error);
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.app-invalid-trade {
+    padding: 16px 20px;
+    border-color: color-mix(in srgb, var(--app-error) 35%, transparent);
+}
+.app-invalid-trade-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.app-invalid-trade-issues {
+    margin: 10px 0 0;
+    padding-left: 20px;
+    font-size: 13px;
+    color: var(--app-text-secondary);
+}
+.app-invalid-trade-issues li + li {
+    margin-top: 4px;
+}
+
+.app-backup-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    align-items: flex-start;
+}
+.app-backup-file {
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--app-text-secondary);
+}
+.app-backup-file::file-selector-button {
+    font-family: inherit;
+    font-weight: 600;
+    margin-right: 12px;
+    padding: 7px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--app-border);
+    background: var(--app-surface-variant);
+    color: var(--app-text-primary);
+    cursor: pointer;
+}
+.app-backup-confirm {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--app-text-secondary);
+    cursor: pointer;
+}
+.app-backup-busy {
+    font-size: 12.5px;
+    color: var(--app-text-secondary);
+}
+.app-btn-danger {
+    background: var(--app-error);
+    color: #fff;
+}
+.app-btn-danger:hover {
+    background: color-mix(in srgb, var(--app-error) 80%, white);
+}
+.app-btn-primary:disabled {
+    opacity: .6;
+    cursor: progress;
+}
+
+/* Recent trades: number of add-ons next to the trade's volume. */
+.app-addon-count {
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--app-accent);
+    background: var(--app-surface-variant);
+    cursor: help;
+}
+
+/* Trades / New Trade: one add-on per row. */
+.app-addon-row {
+    display: grid;
+    grid-template-columns: 28px repeat(4, minmax(0, 1fr)) 40px;
+    gap: 12px;
+    align-items: start;
+    margin-bottom: 4px;
+}
+.app-addon-number {
+    padding-top: 14px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--app-text-secondary);
+}
+@media (max-width: 700px) {
+    .app-addon-row {
+        grid-template-columns: 1fr 1fr;
+    }
+    .app-addon-number {
+        grid-column: 1 / -1;
+        padding-top: 4px;
+    }
+}

@@ -10,7 +10,9 @@ using Shared;
 using Shared.Enums;
 using SharedEnums.Enums;
 using TradingTools.Blazor.Services;
+using TradingTools.Blazor.Services.AddOns;
 using TradingTools.Blazor.Services.Interfaces;
+using TradingTools.Blazor.Services.Validation;
 
 namespace TradingTools.Blazor.Components.Pages
 {
@@ -21,6 +23,10 @@ namespace TradingTools.Blazor.Components.Pages
         [Inject] private IDialogService DialogService { get; set; } = default!;
         [Inject] private Ganss.Xss.IHtmlSanitizer HtmlSanitizer { get; set; } = default!;
         [Inject] private IJSRuntime JS { get; set; } = default!;
+        [Inject] private ITradeValidationMonitor ValidationMonitor { get; set; } = default!;
+
+        /// <summary>Opens this trade directly, e.g. from the Data check page (/trades?tradeId=123).</summary>
+        [SupplyParameterFromQuery] public int? TradeId { get; set; }
 
         private const long MaxFileSizeBytes = 10 * 1024 * 1024;
 
@@ -38,17 +44,87 @@ namespace TradingTools.Blazor.Components.Pages
         private Espresso? AsEspresso => CurrentTradeObj as Espresso;
 
         // Symbol is stored as plain text (existing free-typed values are left alone), so this maps it
-        // to/from the ESymbol select. Older values that don't match one of the 3 options fall back to DAX.
-        private ESymbol CurrentSymbol
+        // to/from the ESymbol select. A missing or older value that isn't one of the 3 options shows as
+        // empty (rather than pretending to be DAX), so it matches what the validation reports.
+        private ESymbol? CurrentSymbol
         {
             get => CurrentBase?.Symbol is { } symbol && MyEnumConverter.SymbolFromString(symbol) is { Success: true } result
                 ? result.Value
-                : ESymbol.DAX;
+                : null;
             set
             {
-                if (CurrentBase is not null) CurrentBase.Symbol = value.ToString();
+                if (CurrentBase is not null && value is not null) CurrentBase.Symbol = value.ToString();
             }
         }
+
+        #region Validation and P&L
+
+        /// <summary>Live validation of the trade on screen - the same rules as the Data check page.</summary>
+        private IReadOnlyList<TradeValidationIssue> CurrentIssues =>
+            CurrentBase is null ? [] : TradeValidator.Validate(CurrentBase);
+
+        /// <summary>The most recent trade isn't flagged on the Data check page since it may still be in progress.</summary>
+        private bool CurrentIsMostRecentTrade =>
+            CurrentBase is not null && ValidationMonitor.LatestReport?.SkippedTradeId == CurrentBase.Id;
+
+        /// <summary>The problems with one field, for its error text; null when there are none.</summary>
+        private string? IssueFor(string field)
+        {
+            var messages = CurrentIssues.Where(i => i.Field == field).Select(i => i.Message).ToList();
+            return messages.Count == 0 ? null : string.Join(" ", messages);
+        }
+
+        private void OnEntryPriceChanged(double? value)
+        {
+            if (CurrentBase is null) return;
+            CurrentBase.EntryPrice = value;
+            RecalculatePnl();
+        }
+
+        private void OnExitPriceChanged(double? value)
+        {
+            if (CurrentBase is null) return;
+            CurrentBase.ExitPrice = value;
+            RecalculatePnl();
+        }
+
+        /// <summary>P&amp;L = |exit - entry|, as long as both prices are there; otherwise it's left as it is.</summary>
+        private void RecalculatePnl()
+        {
+            if (CurrentBase is not null && TradePnl.Points(CurrentBase.EntryPrice, CurrentBase.ExitPrice) is { } points)
+                CurrentBase.PnL = points;
+        }
+
+        #endregion
+
+        #region Add-ons
+
+        private string? AddOnIssue(int index, string property) => IssueFor(TradeValidator.AddOnField(index, property));
+
+        private void AddAddOn() => CurrentBase?.AddOns.Add(TradeAddOns.NewFor(CurrentBase));
+
+        private void RemoveAddOn(TradeAddOn addOn) => CurrentBase?.AddOns.Remove(addOn);
+
+        private static void OnAddOnEntryChanged(TradeAddOn addOn, double? value)
+        {
+            addOn.EntryPrice = value;
+            RecalculateAddOnPnl(addOn);
+        }
+
+        private static void OnAddOnExitChanged(TradeAddOn addOn, double? value)
+        {
+            addOn.ExitPrice = value;
+            RecalculateAddOnPnl(addOn);
+        }
+
+        /// <summary>Same rule as the trade itself: |exit - entry| once both prices are there.</summary>
+        private static void RecalculateAddOnPnl(TradeAddOn addOn)
+        {
+            if (TradePnl.Points(addOn.EntryPrice, addOn.ExitPrice) is { } points)
+                addOn.PnL = points;
+        }
+
+        #endregion
 
         private int SampleSizePosition => _vm is null ? 0 : _vm.SampleSizes.FindIndex(s => s.Id == _vm.CurrentSampleSize.Id);
         private bool CanGoPrevSampleSize => SampleSizePosition > 0;
@@ -56,8 +132,18 @@ namespace TradingTools.Blazor.Components.Pages
 
         protected override async Task OnInitializedAsync()
         {
-            _vm = await TradesService.InitializeTradesViewModelAsync();
-            ResetIndexes();
+            if (TradeId is { } tradeId && await TradesService.GetSampleSizeIdOfTradeAsync(tradeId) is { } sampleSizeId)
+            {
+                _vm = await TradesService.LoadSampleSizeNumberAsync(sampleSizeId);
+                ResetIndexes();
+                int index = _vm.AllTradesInSampleSize.FindIndex(t => t is BaseTrade trade && trade.Id == tradeId);
+                if (index >= 0) _tradeIndex = index;
+            }
+            else
+            {
+                _vm = await TradesService.InitializeTradesViewModelAsync();
+                ResetIndexes();
+            }
             _loading = false;
         }
 

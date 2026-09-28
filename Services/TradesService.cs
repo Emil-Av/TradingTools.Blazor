@@ -8,16 +8,28 @@ using Models.ViewModels;
 using Newtonsoft.Json;
 using SharedEnums.Enums;
 using System.Diagnostics;
+using TradingTools.Blazor.Services.AddOns;
 using TradingTools.Blazor.Services.Interfaces;
+using TradingTools.Blazor.Services.Screenshots;
+using TradingTools.Blazor.Services.Validation;
 using Utilities.Trade;
 
 namespace TradingTools.Blazor.Services
 {
-    public class TradesService(IUnitOfWork unitOfWork, IWebHostEnvironment webHostEnvironment, DeleteTradeService deleteTradeService) : ITradesService
+    public class TradesService(
+        IUnitOfWork unitOfWork,
+        IWebHostEnvironment webHostEnvironment,
+        DeleteTradeService deleteTradeService,
+        ITradeValidationMonitor validationMonitor,
+        ITradeAddOnStore addOnStore,
+        DataAccess.Data.ApplicationDbContext db) : ITradesService
     {
         private readonly IUnitOfWork _unitOfWork = unitOfWork;
+        private readonly ITradeAddOnStore _addOnStore = addOnStore;
+        private readonly DataAccess.Data.ApplicationDbContext _db = db;
         private readonly IWebHostEnvironment webHostEnvironment = webHostEnvironment;
         private readonly DeleteTradeService _deleteTradeService = deleteTradeService;
+        private readonly ITradeValidationMonitor _validationMonitor = validationMonitor;
         private List<SampleSize> _allSampleSizes = [];
         private TradesVM _tradesVM = new();
 
@@ -105,7 +117,10 @@ namespace TradingTools.Blazor.Services
         public async Task UpdateTradeDataAsync(BaseTrade tradeData)
         {
             await _unitOfWork.BaseTrade.UpdateAsync(tradeData);
+            await _addOnStore.StageReplaceAsync(tradeData.Id, tradeData.AddOns);
             await _unitOfWork.SaveAsync();
+            tradeData.SortAddOns(); // new add-ons now have their ids
+            _validationMonitor.RequestValidation();
         }
 
         public async Task UpdateResearchData([FromBody] UpdateResearchDataModel updateResearchData)
@@ -124,6 +139,7 @@ namespace TradingTools.Blazor.Services
                     await UpdateEspressoResearchData(updateResearchData);
                     break;
             }
+            _validationMonitor.RequestValidation();
         }
 
         private async Task UpdateEspressoResearchData(UpdateResearchDataModel updateResearchData)
@@ -160,6 +176,12 @@ namespace TradingTools.Blazor.Services
         }
 
         #region Helper Methods - General
+
+        private static T WithSortedAddOns<T>(T trade) where T : BaseTrade
+        {
+            trade.SortAddOns();
+            return trade;
+        }
 
         private async Task<List<SampleSize>> GetAllSampleSizes()
         {
@@ -220,7 +242,7 @@ namespace TradingTools.Blazor.Services
         private async Task SetEspressoCurrentTrade()
         {
             _tradesVM.AllTradesInSampleSize = [.. (await _unitOfWork.Espresso.GetAllAsync(trade => trade.SampleSizeId == _tradesVM.CurrentSampleSize.Id,
-                                                                                            includeProperties: "Journal")).OrderBy(t => t.Id).Cast<object>()];
+                                                                                            includeProperties: "Journal," + TradeAddOns.Include)).OrderBy(t => t.Id).Select(t => WithSortedAddOns(t)).Cast<object>()];
 
             _tradesVM.CurrentTrade = _tradesVM.AllTradesInSampleSize.Last() as BaseTrade;
             _tradesVM.EspressoTrade = _tradesVM.AllTradesInSampleSize.Last() as Espresso;
@@ -229,7 +251,7 @@ namespace TradingTools.Blazor.Services
         private async Task SetBrunchBreakCurrentTrade()
         {
             _tradesVM.AllTradesInSampleSize = [.. (await _unitOfWork.BrunchBreak.GetAllAsync(trade => trade.SampleSizeId == _tradesVM.CurrentSampleSize.Id,
-                                                                                            includeProperties: "Journal")).OrderBy(t => t.Id).Cast<object>()];
+                                                                                            includeProperties: "Journal," + TradeAddOns.Include)).OrderBy(t => t.Id).Select(t => WithSortedAddOns(t)).Cast<object>()];
 
             _tradesVM.CurrentTrade = _tradesVM.AllTradesInSampleSize.Last() as BaseTrade;
             _tradesVM.BrunchBreakTrade = _tradesVM.AllTradesInSampleSize.Last() as BrunchBreak;
@@ -238,7 +260,7 @@ namespace TradingTools.Blazor.Services
         private async Task SetSRSCurrentTrade()
         {
             _tradesVM.AllTradesInSampleSize = [.. (await _unitOfWork.SRS.GetAllAsync(trade => trade.SampleSizeId == _tradesVM.CurrentSampleSize.Id,
-                                                                                            includeProperties: "Journal")).OrderBy(t => t.Id).Cast<object>()];
+                                                                                            includeProperties: "Journal," + TradeAddOns.Include)).OrderBy(t => t.Id).Select(t => WithSortedAddOns(t)).Cast<object>()];
 
             _tradesVM.CurrentTrade = _tradesVM.AllTradesInSampleSize.Last() as BaseTrade;
             _tradesVM.SRSTrade = _tradesVM.AllTradesInSampleSize.Last() as SRS;
@@ -309,7 +331,13 @@ namespace TradingTools.Blazor.Services
 
         public async Task DeleteTrade(DeleteTradeRequestModel deleteTradeRequest)
         {
+            // The Trades page keeps the trades it loaded tracked for the whole circuit, while
+            // DeleteTradeService (shared with the Razor Pages app, which got a fresh context per request)
+            // loads its own untracked copy and removes that - EF refuses a second instance with the same
+            // key. The page reloads everything after a delete, so nothing tracked is still needed.
+            _db.ChangeTracker.Clear();
             await _deleteTradeService.DeleteTrade(deleteTradeRequest.Strategy, deleteTradeRequest.Id, webHostEnvironment.WebRootPath);
+            _validationMonitor.RequestValidation();
         }
 
         public async Task<List<string>> UploadScreenshotsAsync(int tradeId, IFormFile[] files)
@@ -335,7 +363,7 @@ namespace TradingTools.Blazor.Services
             }
 
             // Save the files to disk
-            var newScreenshotPaths = await SaveFilesToDiskAsync(webHostEnvironment.WebRootPath, tradeFolderPath, files);
+            var newScreenshotPaths = await ScreenshotStorage.SaveFilesToFolderAsync(webHostEnvironment.WebRootPath, tradeFolderPath, files);
 
             trade.ScreenshotsUrls.AddRange(newScreenshotPaths);
 
@@ -345,37 +373,7 @@ namespace TradingTools.Blazor.Services
             return trade.ScreenshotsUrls;
         }
 
-        private async Task<List<string>> SaveFilesToDiskAsync(string webRootPath, string destinationPath, IFormFile[] files)
-        {
-            List<string> screenshotsPaths = [];
-
-            try
-            {
-                foreach (IFormFile file in files)
-                {
-                    // The browser-supplied file name can contain path separators (either '/' or '\',
-                    // regardless of the server's OS - a Windows client uploading to a Linux server can
-                    // still send one). Path.GetFileName strips any directory portion so the file always
-                    // lands inside destinationPath instead of wherever a crafted name points to.
-                    string safeFileName = Path.GetFileName(file.FileName);
-                    string filePath = Path.Combine(destinationPath, safeFileName);
-
-                    using (Stream stream = new FileStream(filePath, FileMode.Create))
-                    {
-                        await file.CopyToAsync(stream);
-                    }
-
-                    string dbFilePath = Path.GetRelativePath(webRootPath, filePath).Replace("\\", "/");
-                    screenshotsPaths.Add(dbFilePath);
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Error in saving uploaded files: {ex.Message}");
-                throw;
-            }
-
-            return screenshotsPaths;
-        }
+        public async Task<int?> GetSampleSizeIdOfTradeAsync(int tradeId) =>
+            (await _unitOfWork.BaseTrade.GetAsync(t => t.Id == tradeId))?.SampleSizeId;
     }
 }

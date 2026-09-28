@@ -42,8 +42,9 @@ namespace TradingTools.Blazor.Services.Dashboard
 
             double netEuro = trades.Sum(t => t.Euro ?? 0); // unrounded; rounded to cents only when reported
 
-            var winPoints = trades.Where(t => t.Outcome == EOutcome.Win && t.Points is not null).Select(t => t.Points!.Value).ToList();
-            var lossPoints = trades.Where(t => t.Outcome == EOutcome.Loss && t.Points is not null).Select(t => t.Points!.Value).ToList();
+            // A trade's points include its add-ons: it's still one trade, with one combined result.
+            var winPoints = trades.Where(t => t.Outcome == EOutcome.Win && t.TotalPoints is not null).Select(t => t.TotalPoints!.Value).ToList();
+            var lossPoints = trades.Where(t => t.Outcome == EOutcome.Loss && t.TotalPoints is not null).Select(t => t.TotalPoints!.Value).ToList();
 
             var (current, bestWin, worstLoss) = Streaks(trades);
 
