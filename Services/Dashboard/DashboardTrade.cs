@@ -1,5 +1,6 @@
 using Shared.Enums;
 using SharedEnums.Enums;
+using TradingTools.Blazor.Services.Calculation;
 
 namespace TradingTools.Blazor.Services.Dashboard
 {
@@ -7,8 +8,9 @@ namespace TradingTools.Blazor.Services.Dashboard
     /// A closed SRS/Espresso trade flattened for the dashboard.
     /// </summary>
     /// <param name="Points">
-    /// Signed result in points of the original position (add-ons not included, see <see cref="TotalPoints"/>):
-    /// positive for a win, negative for a loss, 0 for breakeven.
+    /// Signed result in points of the original position (add-ons not included, see <see cref="TotalPoints"/>),
+    /// after the instrument's spread (see <see cref="TradeResults"/>): positive for a win, negative for a loss,
+    /// minus the spread for a breakeven - and a small win can end up below zero.
     /// Null when the trade has no usable points recorded (see <see cref="DashboardService"/>).
     /// </param>
     /// <param name="SampleSizeNumber">1-based position of the sample size among those with the same account type, strategy and timeframe.</param>
@@ -44,26 +46,14 @@ namespace TradingTools.Blazor.Services.Dashboard
         /// add-on's points × volume. Null when any part is unknown.
         /// </summary>
         public double? Euro =>
-            EuroOf(Points, Volume) is { } main && AddOns.All(a => a.Euro is not null)
+            TradeResults.EuroOf(Points, Volume) is { } main && AddOns.All(a => a.Euro is not null)
                 ? main + AddOns.Sum(a => a.Euro!.Value)
                 : null;
-
-        /// <summary>
-        /// Points multiplied by the volume. Null when either is unknown - except 0 points
-        /// (breakeven), which is 0 euro whatever the volume, so it's known even without a recorded volume.
-        /// </summary>
-        internal static double? EuroOf(double? points, double? volume) => points switch
-        {
-            null => null,
-            0d => 0,
-            { } p when volume is { } v => p * v,
-            _ => null
-        };
     }
 
     /// <param name="Points">Signed result in points: positive when the add-on made money. Null when a price is missing.</param>
     public sealed record DashboardAddOn(double? Points, double? Volume)
     {
-        public double? Euro => DashboardTrade.EuroOf(Points, Volume);
+        public double? Euro => TradeResults.EuroOf(Points, Volume);
     }
 }

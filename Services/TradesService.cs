@@ -11,6 +11,7 @@ using System.Diagnostics;
 using TradingTools.Blazor.Services.AddOns;
 using TradingTools.Blazor.Services.Interfaces;
 using TradingTools.Blazor.Services.Screenshots;
+using TradingTools.Blazor.Services.Settings;
 using TradingTools.Blazor.Services.Validation;
 using Utilities.Trade;
 
@@ -22,8 +23,10 @@ namespace TradingTools.Blazor.Services
         DeleteTradeService deleteTradeService,
         ITradeValidationMonitor validationMonitor,
         ITradeAddOnStore addOnStore,
-        DataAccess.Data.ApplicationDbContext db) : ITradesService
+        DataAccess.Data.ApplicationDbContext db,
+        ISettingsService settings) : ITradesService
     {
+        private readonly ISettingsService _settings = settings;
         private readonly IUnitOfWork _unitOfWork = unitOfWork;
         private readonly ITradeAddOnStore _addOnStore = addOnStore;
         private readonly DataAccess.Data.ApplicationDbContext _db = db;
@@ -94,9 +97,20 @@ namespace TradingTools.Blazor.Services
             return _tradesVM;
         }
 
+        /// <summary>
+        /// The page's first view: the latest trade of the default account (Settings). The type, strategy and
+        /// timeframe can still be changed on the page. Falls back to the latest trade of any account while the
+        /// default account has none yet.
+        /// </summary>
         public async Task<TradesVM> InitializeTradesViewModelAsync()
         {
             _allSampleSizes = await GetAllSampleSizes();
+
+            var account = await _settings.GetDefaultAccountAsync();
+            if (_allSampleSizes.Any(sampleSize => sampleSize.SampleSizeType == account))
+            {
+                _allSampleSizes = [.. _allSampleSizes.Where(sampleSize => sampleSize.SampleSizeType == account)];
+            }
 
             if (!_allSampleSizes.Any())
             {

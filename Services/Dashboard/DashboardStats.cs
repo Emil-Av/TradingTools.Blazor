@@ -8,8 +8,8 @@ namespace TradingTools.Blazor.Services.Dashboard
     /// </summary>
     public static class DashboardStats
     {
-        /// <summary>The account's starting value in euro.</summary>
-        public const double StartingBalance = 2000;
+        /// <summary>The starting balance used when none is given: what the account amount was before it became a setting.</summary>
+        public const double DefaultStartingBalance = 2000;
 
         public sealed record Streak(EOutcome? Outcome, int Length);
 
@@ -27,11 +27,12 @@ namespace TradingTools.Blazor.Services.Dashboard
             int WorstLossStreak,
             int TradesWithoutResult);
 
-        public sealed record EquityPoint(DateOnly? Date, double Balance);
+        /// <param name="IsReset">The point where the equity curve was reset: the balance jumps to the amount entered then (see <see cref="Settings.AccountEquitySettings"/>).</param>
+        public sealed record EquityPoint(DateOnly? Date, double Balance, bool IsReset = false);
 
         public sealed record Breakdown(string Name, int Trades, int Wins, int Losses, double? WinRate, double NetEuro);
 
-        public static Summary Summarize(IReadOnlyList<DashboardTrade> trades)
+        public static Summary Summarize(IReadOnlyList<DashboardTrade> trades, double startingBalance = DefaultStartingBalance)
         {
             int wins = trades.Count(t => t.Outcome == EOutcome.Win);
             int losses = trades.Count(t => t.Outcome == EOutcome.Loss);
@@ -54,7 +55,7 @@ namespace TradingTools.Blazor.Services.Dashboard
                 breakevens,
                 winRate,
                 Cents(netEuro),
-                Cents(StartingBalance + netEuro),
+                Cents(startingBalance + netEuro),
                 winPoints.Count == 0 ? null : winPoints.Average(),
                 lossPoints.Count == 0 ? null : lossPoints.Average(),
                 current,
@@ -98,13 +99,13 @@ namespace TradingTools.Blazor.Services.Dashboard
         }
 
         /// <summary>
-        /// Account balance after each trade, starting from <see cref="StartingBalance"/>. The first
+        /// Account balance after each trade, starting from <paramref name="startingBalance"/>. The first
         /// point is the starting balance itself (no date). Trades without a euro result don't move
         /// the balance and don't add a point.
         /// </summary>
-        public static List<EquityPoint> EquityCurve(IEnumerable<DashboardTrade> trades)
+        public static List<EquityPoint> EquityCurve(IEnumerable<DashboardTrade> trades, double startingBalance = DefaultStartingBalance)
         {
-            var points = new List<EquityPoint> { new(null, StartingBalance) };
+            var points = new List<EquityPoint> { new(null, startingBalance) };
 
             // Accumulate the net result exactly the way Summarize does (from 0, in the same order) and
             // add the starting balance per point, so the last point always equals Summary.Balance.
@@ -113,19 +114,19 @@ namespace TradingTools.Blazor.Services.Dashboard
             {
                 if (trade.Euro is not { } euro) continue;
                 net += euro;
-                points.Add(new EquityPoint(trade.Date, Cents(StartingBalance + net)));
+                points.Add(new EquityPoint(trade.Date, Cents(startingBalance + net)));
             }
 
             return points;
         }
 
-        /// <summary>Largest peak-to-trough drop of the balance, in euro (0 or positive).</summary>
+        /// <summary>Largest peak-to-trough drop of the balance, in euro (0 or positive). A reset point starts the peak over: the jump to the new amount is not a loss.</summary>
         public static double MaxDrawdown(IEnumerable<EquityPoint> curve)
         {
             double peak = double.MinValue, maxDrawdown = 0;
             foreach (var point in curve)
             {
-                peak = Math.Max(peak, point.Balance);
+                peak = point.IsReset ? point.Balance : Math.Max(peak, point.Balance);
                 maxDrawdown = Math.Max(maxDrawdown, peak - point.Balance);
             }
             return maxDrawdown;
@@ -153,6 +154,6 @@ namespace TradingTools.Blazor.Services.Dashboard
         /// which would otherwise show a flat result as a negative "−€0.00". Adding 0.0 turns a
         /// rounded -0.0 into +0.0.
         /// </summary>
-        private static double Cents(double euro) => Math.Round(euro, 2, MidpointRounding.AwayFromZero) + 0.0;
+        internal static double Cents(double euro) => Math.Round(euro, 2, MidpointRounding.AwayFromZero) + 0.0;
     }
 }

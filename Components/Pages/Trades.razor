@@ -74,12 +74,18 @@ else
                 @* The whole screenshot is always shown, never cropped: it fills the width at its own proportions,
                    and is scaled down (contain) when that would be taller than 78% of the window. A fixed-size box
                    with object-fit:cover cropped it whenever the window's shape differed from the screenshot's. *@
-                <div style="position:relative; border-radius:12px; overflow:hidden; background:var(--app-bg); border:1px solid var(--app-border);">
-                    <img src="@("/" + urls[_screenshotIndex])" alt="Screenshot @(_screenshotIndex + 1) of @urls.Count" style="display:block; width:100%; height:auto; max-height:78vh; object-fit:contain;" />
+                @* data-fullscreen: the whole box (image, buttons, counter) goes full screen (wwwroot/js/fullscreen.js), so
+                   the previous/next buttons - Blazor handlers - stay clickable, and the arrow keys press them. *@
+                <div class="app-carousel" data-fullscreen>
+                    <img class="app-carousel-img" src="@("/" + urls[_screenshotIndex])" alt="Screenshot @(_screenshotIndex + 1) of @urls.Count" />
+                    <button type="button" class="app-carousel-btn app-carousel-fs" onclick="appFullscreen.toggle(this)" title="Full screen (Esc to close)" aria-label="Toggle full screen">
+                        <svg class="app-fs-enter" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+                        <svg class="app-fs-exit" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /></svg>
+                    </button>
                     @if (urls.Count > 1)
                     {
-                        <button class="app-carousel-btn" style="left:14px;" @onclick="PrevScreenshot"><MudIcon Icon="@Icons.Material.Filled.ChevronLeft" /></button>
-                        <button class="app-carousel-btn" style="right:14px;" @onclick="NextScreenshot"><MudIcon Icon="@Icons.Material.Filled.ChevronRight" /></button>
+                        <button class="app-carousel-btn" style="left:14px;" data-fullscreen-prev aria-label="Previous screenshot" @onclick="PrevScreenshot"><MudIcon Icon="@Icons.Material.Filled.ChevronLeft" /></button>
+                        <button class="app-carousel-btn" style="right:14px;" data-fullscreen-next aria-label="Next screenshot" @onclick="NextScreenshot"><MudIcon Icon="@Icons.Material.Filled.ChevronRight" /></button>
                         <div style="position:absolute; bottom:10px; left:0; right:0; text-align:center; color:white; font-size:11px; text-shadow:0 1px 2px black;">@(_screenshotIndex + 1) / @urls.Count</div>
                     }
                 </div>
@@ -171,6 +177,32 @@ else
                                              Error="@(IssueFor(nameof(BaseTrade.PnL)) is not null)" ErrorText="@IssueFor(nameof(BaseTrade.PnL))" />
                         </MudItem>
                     </MudGrid>
+                    @* The same calculation as the dashboard and the history: spread taken off every position. *@
+                    <div class="app-addon-net">
+                        @if (CurrentResult is { Euro: { } resultEuro } result)
+                        {
+                            <span>Result after spread</span>
+                            <span class="app-mono @DashboardFormat.ToneClass(resultEuro)">@DashboardFormat.SignedEuro(resultEuro)</span>
+                            @if (result.Points is { } resultPoints)
+                            {
+                                <span class="app-mono @DashboardFormat.ToneClass(resultPoints)">@DashboardFormat.SignedPoints(resultPoints)</span>
+                            }
+                            <span class="app-addon-net-parts">
+                                @if (CurrentSpread > 0)
+                                {
+                                    <span>spread @DashboardFormat.Number(CurrentSpread) pts per position, @DashboardFormat.SignedEuro(-result.SpreadEuro) in total</span>
+                                }
+                                else
+                                {
+                                    <span>no spread set for @(string.IsNullOrWhiteSpace(CurrentBase.Symbol) ? "this instrument" : CurrentBase.Symbol) - see Settings</span>
+                                }
+                            </span>
+                        }
+                        else
+                        {
+                            <span>Result after spread: fill in the outcome, the P&amp;L and the amount to see it.</span>
+                        }
+                    </div>
                     <MudDivider Class="my-3" />
                     <div style="display:flex; align-items:center; justify-content:space-between;" class="mb-2">
                         <MudText Typo="Typo.overline" Style="color:var(--app-text-secondary);">Add-ons</MudText>
@@ -196,6 +228,7 @@ else
                             <MudNumericField Margin="Margin.Dense" T="double?" @bind-Value="addOn.PnL" Label="P&amp;L (points)" Variant="Variant.Outlined" Format="F2"
                                              Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Calculate" AdornmentAriaLabel="Recalculate from entry and exit" OnAdornmentClick="@(() => RecalculateAddOnPnl(addOn))"
                                              Error="@(AddOnIssue(index, nameof(TradeAddOn.PnL)) is not null)" ErrorText="@AddOnIssue(index, nameof(TradeAddOn.PnL))" />
+                            <AddOnOutcome Dense="true" Outcome="@TradeAddOns.OutcomeOf(addOn, CurrentBase.Direction)" />
                             <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" aria-label="Remove add-on" Style="margin-top:6px;" OnClick="@(() => RemoveAddOn(addOn))" />
                         </div>
                     }
@@ -205,7 +238,7 @@ else
                         <div class="app-addon-net">
                             @if (CurrentNet is { } net)
                             {
-                                <span>Net result of the whole trade</span>
+                                <span>Net result after spread</span>
                                 <span class="app-mono @DashboardFormat.ToneClass(net.NetEuro)">@DashboardFormat.SignedEuro(net.NetEuro)</span>
                                 <span>&rarr; <strong>@net.Outcome</strong></span>
                                 <span class="app-addon-net-parts">main <span class="app-mono">@DashboardFormat.SignedEuro(net.MainEuro)</span> · add-ons <span class="app-mono">@DashboardFormat.SignedEuro(net.AddOnsEuro)</span></span>

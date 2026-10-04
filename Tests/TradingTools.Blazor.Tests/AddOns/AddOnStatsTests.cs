@@ -88,7 +88,7 @@ namespace TradingTools.Blazor.Tests.AddOns
             summary.AvgWinPoints.Should().Be(25);   // (40 + 10) / 2
             summary.AvgLossPoints.Should().Be(-16);
             summary.NetEuro.Should().Be(34);
-            summary.Balance.Should().Be(DashboardStats.StartingBalance + 34);
+            summary.Balance.Should().Be(DashboardStats.DefaultStartingBalance + 34);
         }
 
         [Fact]
@@ -97,7 +97,7 @@ namespace TradingTools.Blazor.Tests.AddOns
             var curve = DashboardStats.EquityCurve([With(Win(20, volume: 1), new DashboardAddOn(10, 2)), Loss(-5, volume: 1)]);
 
             curve.Select(p => p.Balance).Should().Equal(
-                DashboardStats.StartingBalance, DashboardStats.StartingBalance + 40, DashboardStats.StartingBalance + 35);
+                DashboardStats.DefaultStartingBalance, DashboardStats.DefaultStartingBalance + 40, DashboardStats.DefaultStartingBalance + 35);
         }
 
         [Fact]
@@ -118,7 +118,7 @@ namespace TradingTools.Blazor.Tests.AddOns
                           new() { Id = 2, EntryPrice = 995, ExitPrice = 980, Volume = 2, PnL = 15 }], // short, closed lower: +15
             };
 
-            var result = (await new DashboardService(TestUnitOfWork.Create([sampleSize], [trade])).GetTradesAsync()).Should().ContainSingle().Subject;
+            var result = (await new DashboardService(TestUnitOfWork.Create([sampleSize], [trade]), TestSettings.NoSpreads()).GetTradesAsync()).Should().ContainSingle().Subject;
 
             result.AddOns.Should().Equal(new DashboardAddOn(15, 2), new DashboardAddOn(-5, 1));
             result.TotalPoints.Should().Be(30);  // 20 + 15 − 5

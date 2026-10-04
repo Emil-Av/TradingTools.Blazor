@@ -9,6 +9,7 @@ using SharedEnums.Enums;
 using TradingTools.Blazor.Services;
 using TradingTools.Blazor.Services.AddOns;
 using TradingTools.Blazor.Services.Interfaces;
+using TradingTools.Blazor.Services.Settings;
 using TradingTools.Blazor.Services.Validation;
 
 namespace TradingTools.Blazor.Components.Pages
@@ -18,6 +19,7 @@ namespace TradingTools.Blazor.Components.Pages
         [Inject] private INewTradeService NewTradeService { get; set; } = default!;
         [Inject] private ISnackbar Snackbar { get; set; } = default!;
         [Inject] private IJSRuntime JS { get; set; } = default!;
+        [Inject] private ISettingsService SettingsService { get; set; } = default!;
 
         private const long MaxFileSizeBytes = 10 * 1024 * 1024;
 
@@ -45,6 +47,18 @@ namespace TradingTools.Blazor.Components.Pages
         private bool _isFlippedSwitch;
 
         private bool _saving;
+
+        // The spread of each instrument (Settings page): taken off every position's result, so the outcome set
+        // from the net result of a trade with add-ons agrees with the Trades page and the dashboard.
+        private SpreadTable _spreads = SpreadTable.None;
+
+        protected override async Task OnInitializedAsync()
+        {
+            _spreads = await SettingsService.GetSpreadsAsync();
+
+            // A new trade starts on the default account (Settings): Demo Trading or Trade. It can still be changed above.
+            _sizeData.SampleSizeType = await SettingsService.GetDefaultAccountAsync();
+        }
 
         // See the matching comment in Trades.razor.cs: clicking the drop zone asks JS to click the
         // hidden <InputFile> directly rather than relying on a <label for="..."> to forward the click.
@@ -93,7 +107,7 @@ namespace TradingTools.Blazor.Components.Pages
         }
 
         /// <summary>The whole trade's result in euro (main position + add-ons); null without add-ons or while something is missing.</summary>
-        private TradeNetResult? Net => _addOns.Count > 0 ? TradeNet.Calculate(_direction, _entryPrice, _exitPrice, _amount, _addOns) : null;
+        private TradeNetResult? Net => _addOns.Count > 0 ? TradeNet.Calculate(_direction, _entryPrice, _exitPrice, _amount, _addOns, _spreads.For(_symbol.ToString())) : null;
 
         /// <summary>With add-ons the outcome is the net result of the whole trade (it can still be changed by hand).</summary>
         private void RecalculateOutcome()

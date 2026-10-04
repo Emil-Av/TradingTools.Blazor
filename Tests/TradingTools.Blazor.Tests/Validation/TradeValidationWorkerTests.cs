@@ -8,7 +8,7 @@ namespace TradingTools.Blazor.Tests.Validation
 {
     public class TradeValidationWorkerTests
     {
-        private static readonly TradeValidationReport SomeReport = new(DateTime.UnixEpoch, 5, 9, []);
+        private static readonly TradeValidationReport SomeReport = new(DateTime.UnixEpoch, SharedEnums.Enums.SampleSizeType.DemoTrading, 5, 9, []);
 
         private static (TradeValidationWorker Worker, TradeValidationMonitor Monitor, ITradeValidationService Service) Create()
         {

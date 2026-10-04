@@ -9,24 +9,8 @@
 <div class="app-content">
 
     <TopBar Title="Dashboard" Subtitle="@($"{DashboardSelection.StrategyLabel(_strategy)} · {DateTime.Now.ToString("dddd, MMMM d", System.Globalization.CultureInfo.InvariantCulture)}")">
-        <div class="app-seg-group">
-            <div class="app-seg" role="group" aria-label="Strategy">
-                @foreach (var strategy in DashboardSelection.Strategies)
-                {
-                    <button type="button" aria-pressed="@(strategy == _strategy ? "true" : "false")" @onclick="() => SelectStrategy(strategy)">
-                        @DashboardSelection.StrategyLabel(strategy)
-                    </button>
-                }
-            </div>
-            <div class="app-seg" role="group" aria-label="Account">
-                @foreach (var account in DashboardSelection.Accounts)
-                {
-                    <button type="button" aria-pressed="@(account == _account ? "true" : "false")" @onclick="() => SelectAccount(account)">
-                        @MyEnumConverter.TradeTypeFromEnum(account)
-                    </button>
-                }
-            </div>
-        </div>
+        <TradeSelectionSwitch @bind-SelectedStrategy="_strategy" @bind-SelectedStrategy:after="RefreshAsync"
+                              @bind-SelectedAccount="_account" @bind-SelectedAccount:after="RefreshAsync" />
     </TopBar>
 
     @if (_loading)
@@ -86,25 +70,52 @@
         </section>
 
         <div class="app-dash-grid">
-            <section class="app-card app-equity-card" style="padding:20px 22px;" aria-label="Equity curve">
+            <section class="app-card app-equity-card" data-fullscreen style="padding:20px 22px;" aria-label="Equity curve">
                 <div style="display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:10px;">
                     <div>
                         <div style="font-size:15px; font-weight:700;">Equity curve</div>
-                        <div class="app-balance app-mono @(s.NetEuro < 0 ? "app-loss" : "")">@DashboardFormat.Euro(s.Balance)</div>
+                        <div class="app-balance app-mono @(_equityView.NetEuro < 0 ? "app-loss" : "")">@DashboardFormat.Euro(_equityView.EndBalance)</div>
                     </div>
                     <div style="display:flex; align-items:flex-start; gap:14px;">
                         <div style="text-align:right; font-size:12px; color:var(--app-text-secondary); line-height:1.7;">
-                            <div>Start <span class="app-mono">@DashboardFormat.Euro(DashboardStats.StartingBalance)</span> · Net <span class="app-mono @DashboardFormat.ToneClass(s.NetEuro)">@DashboardFormat.SignedEuro(s.NetEuro)</span> (<span class="app-mono">@ReturnLabel(s.NetEuro)</span>)</div>
-                            <div>Max drawdown <span class="app-mono app-loss">@DashboardFormat.Euro(_maxDrawdown)</span></div>
+                            <div>Start <span class="app-mono">@DashboardFormat.Euro(_equityView.StartBalance)</span> · Net <span class="app-mono @DashboardFormat.ToneClass(_equityView.NetEuro)">@DashboardFormat.SignedEuro(_equityView.NetEuro)</span> (<span class="app-mono">@ReturnLabel(_equityView.NetEuro, _equityView.StartBalance)</span>)</div>
+                            <div>Max drawdown <span class="app-mono app-loss">@DashboardFormat.Euro(_equityView.MaxDrawdown)</span></div>
                         </div>
-                        @* A plain onclick (not @onclick): full screen is handled in the browser (wwwroot/js/equityChart.js), no server round trip. *@
-                        <button type="button" class="app-equity-fullscreen" onclick="appEquityChart.toggleFullscreen(this)" title="Full screen (Esc to close)" aria-label="Toggle full screen">
-                            <svg class="app-equity-fs-enter" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
-                            <svg class="app-equity-fs-exit" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /></svg>
+                        @* A plain onclick (not @onclick): full screen is handled in the browser (wwwroot/js/fullscreen.js), no server round trip. *@
+                        <button type="button" class="app-fs-btn" onclick="appFullscreen.toggle(this)" title="Full screen (Esc to close)" aria-label="Toggle full screen">
+                            <svg class="app-fs-enter" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+                            <svg class="app-fs-exit" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /></svg>
                         </button>
                     </div>
                 </div>
-                <EquityChart Points="_equity" />
+                @* Which part of the history the curve shows. Reset curves are never deleted: "All history" always
+                   shows everything, with each reset marked. The date pickers are hidden in full screen (their
+                   calendars open outside the full-screen element). *@
+                <div class="app-equity-controls">
+                    <div class="app-seg" role="group" aria-label="Equity curve history">
+                        <button type="button" aria-pressed="@(_scope == EquityScope.SinceLastReset ? "true" : "false")" @onclick="() => SelectScope(EquityScope.SinceLastReset)"
+                                title="@(_accountSettings.Resets.Count == 0 ? "No reset yet: the same as all history" : "From the last reset")">
+                            @(_accountSettings.Resets.Count == 0 ? "Whole curve" : "Since last reset")
+                        </button>
+                        <button type="button" aria-pressed="@(_scope == EquityScope.AllHistory ? "true" : "false")" @onclick="() => SelectScope(EquityScope.AllHistory)"
+                                title="Everything that went down, with each reset marked">
+                            All history
+                        </button>
+                    </div>
+                    @if (_accountSettings.Resets.Count > 0)
+                    {
+                        <span class="app-equity-note">@_accountSettings.Resets.Count reset@(_accountSettings.Resets.Count == 1 ? "" : "s") · last on @DashboardFormat.ShortDate(DateOnly.FromDateTime(_accountSettings.Resets[^1].ResetAtUtc))</span>
+                    }
+                    <div class="app-equity-range">
+                        <div style="width:150px;">
+                            <MudDatePicker Culture="AppCulture.DatePicker" @bind-Date="_equityFrom" @bind-Date:after="BuildEquity" Label="From" MaxDate="_equityTo" Clearable="true" Editable="true" Margin="Margin.Dense" Variant="Variant.Outlined" />
+                        </div>
+                        <div style="width:150px;">
+                            <MudDatePicker Culture="AppCulture.DatePicker" @bind-Date="_equityTo" @bind-Date:after="BuildEquity" Label="To" MinDate="_equityFrom" Clearable="true" Editable="true" Margin="Margin.Dense" Variant="Variant.Outlined" />
+                        </div>
+                    </div>
+                </div>
+                <EquityChart Points="_equityView.Points" StartBalance="_equityView.StartBalance" />
                 <div style="font-size:11.5px; color:var(--app-text-secondary); margin-top:8px;">
                     Each trade: points &times; volume = euro won or lost, add-ons included (each with its own volume).
                     @if (s.TradesWithoutResult > 0)
@@ -124,109 +135,8 @@
             </section>
         </div>
 
-        var filtered = FilteredTradesChronological;
-        var filteredSummary = DashboardStats.Summarize(filtered);
-        double maxEuro = Math.Max(filtered.Select(t => Math.Abs(t.Euro ?? 0)).DefaultIfEmpty(0).Max(), 0.01);
-
-        <section class="app-card" style="padding:8px 0 4px;" aria-label="Recent trades">
-            <div style="padding:14px 22px 6px; font-size:15px; font-weight:700;">Recent trades</div>
-
-            <div style="display:flex; flex-wrap:wrap; gap:12px; padding:6px 22px 10px; align-items:center;">
-                @* Only useful when the page shows both strategies. *@
-                @if (_strategy is null)
-                {
-                    <MudSelect T="string" Value="_filterStrategy" ValueChanged="OnStrategyFilterChanged" Label="Strategy" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:150px; flex:0 0 auto;">
-                        <MudSelectItem Value="@All">All</MudSelectItem>
-                        @foreach (var strategy in StrategyOptions)
-                        {
-                            <MudSelectItem Value="@strategy">@strategy</MudSelectItem>
-                        }
-                    </MudSelect>
-                }
-                <MudSelect T="string" Value="_filterTimeFrame" ValueChanged="OnTimeFrameFilterChanged" Label="Time frame" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:140px; flex:0 0 auto;">
-                    <MudSelectItem Value="@All">All</MudSelectItem>
-                    @foreach (var tf in TimeFrameOptions)
-                    {
-                        <MudSelectItem Value="@tf">@MyEnumConverter.TimeFrameFromEnum(Enum.Parse<TimeFrame>(tf))</MudSelectItem>
-                    }
-                </MudSelect>
-                <MudSelect T="int" @bind-Value="_filterSampleSizeId" @bind-Value:after="ResetPage" Label="Sample size" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:190px; flex:0 0 auto;">
-                    <MudSelectItem Value="0">All</MudSelectItem>
-                    @foreach (var option in SampleSizeOptions)
-                    {
-                        <MudSelectItem Value="@option.Id">@option.Label</MudSelectItem>
-                    }
-                </MudSelect>
-                <MudSelect T="PeriodFilter" @bind-Value="_filterPeriod" @bind-Value:after="ResetPage" Label="Period" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:160px; flex:0 0 auto;">
-                    @foreach (var period in Enum.GetValues<PeriodFilter>())
-                    {
-                        <MudSelectItem Value="@period">@PeriodLabel(period)</MudSelectItem>
-                    }
-                </MudSelect>
-                @if (_filterPeriod == PeriodFilter.LastXTrades)
-                {
-                    <MudNumericField T="int" @bind-Value="_lastXTrades" @bind-Value:after="ResetPage" Label="X" Min="1" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:100px; flex:0 0 auto;" Immediate="true" />
-                }
-                @* Each bound limits the other's calendar, so the range can't be entered backwards.
-                   The width sits on a wrapper: a date picker also applies its Style to the calendar
-                   popup, which would squeeze the calendar into the field's width and cut it off. *@
-                <div style="width:160px; flex:0 0 auto;">
-                    <MudDatePicker Culture="AppCulture.DatePicker" @bind-Date="_filterFrom" @bind-Date:after="ResetPage" Label="From" MaxDate="_filterTo" Clearable="true" Editable="true" Margin="Margin.Dense" Variant="Variant.Outlined" />
-                </div>
-                <div style="width:160px; flex:0 0 auto;">
-                    <MudDatePicker Culture="AppCulture.DatePicker" @bind-Date="_filterTo" @bind-Date:after="ResetPage" Label="To" MinDate="_filterFrom" Clearable="true" Editable="true" Margin="Margin.Dense" Variant="Variant.Outlined" />
-                </div>
-            </div>
-
-            <div style="padding:0 22px 8px; font-size:12px; color:var(--app-text-secondary);">
-                @filtered.Count trades · @(filteredSummary.Wins)W / @(filteredSummary.Losses)L / @(filteredSummary.Breakevens) BE ·
-                Win rate <span class="app-mono">@DashboardFormat.Percent(filteredSummary.WinRate)</span> ·
-                Net <span class="app-mono @DashboardFormat.ToneClass(filteredSummary.NetEuro)">@DashboardFormat.SignedEuro(filteredSummary.NetEuro)</span>
-            </div>
-
-            <MudTable T="DashboardTrade" @bind-CurrentPage="_currentPage" Items="@(Enumerable.Reverse(filtered))" Dense="true" Hover="true" Elevation="0" RowsPerPage="10" Class="app-recent-trades">
-                <HeaderContent>
-                    <MudTh>Date</MudTh>
-                    <MudTh>Symbol</MudTh>
-                    <MudTh>Dir</MudTh>
-                    <MudTh>Strategy</MudTh>
-                    <MudTh>TF</MudTh>
-                    <MudTh>Sample</MudTh>
-                    <MudTh Style="text-align:right;">Volume</MudTh>
-                    <MudTh Style="text-align:right;">Points</MudTh>
-                    <MudTh Style="text-align:center;">P&amp;L</MudTh>
-                    <MudTh>Outcome</MudTh>
-                </HeaderContent>
-                <RowTemplate>
-                    <MudTd DataLabel="Date" Style="color:var(--app-text-secondary); white-space:nowrap;">@DashboardFormat.ShortDate(context.Date)</MudTd>
-                    <MudTd DataLabel="Symbol"><span class="app-mono" style="font-weight:600;">@context.Symbol</span></MudTd>
-                    <MudTd DataLabel="Dir"><span class="app-dir @(context.Direction == EDirection.Long ? "long" : "short")">@context.Direction.ToString().ToUpperInvariant()</span></MudTd>
-                    <MudTd DataLabel="Strategy" Style="color:var(--app-text-secondary);">@MyEnumConverter.StrategyFromEnum(context.Strategy)</MudTd>
-                    <MudTd DataLabel="TF" Style="color:var(--app-text-secondary);">@MyEnumConverter.TimeFrameFromEnum(context.TimeFrame)</MudTd>
-                    <MudTd DataLabel="Sample" Style="color:var(--app-text-secondary);">#@context.SampleSizeNumber</MudTd>
-                    <MudTd DataLabel="Volume" Style="text-align:right; white-space:nowrap;">
-                        <span class="app-mono">@(context.Volume is { } v ? DashboardFormat.Number(v) : "—")</span>
-                        @if (context.AddOns.Count > 0)
-                        {
-                            <span class="app-addon-count" title="@context.AddOns.Count add-on@(context.AddOns.Count == 1 ? "" : "s"), included in the points and P&amp;L">+@context.AddOns.Count</span>
-                        }
-                    </MudTd>
-                    <MudTd DataLabel="Points" Style="text-align:right; white-space:nowrap;">
-                        <span class="app-mono @(context.TotalPoints is { } tone ? DashboardFormat.ToneClass(tone) : "app-flat")">@(context.TotalPoints is { } p ? DashboardFormat.SignedPoints(p) : "—")</span>
-                    </MudTd>
-                    <MudTd DataLabel="P&amp;L" Class="app-pl-cell">
-                        <DivergingBar Value="context.Euro" Max="maxEuro" Reach="22" ShowLabel="true" />
-                    </MudTd>
-                    <MudTd DataLabel="Outcome"><span class="app-chip @OutcomeChip(context.Outcome)">@context.Outcome</span></MudTd>
-                </RowTemplate>
-                <NoRecordsContent>
-                    <MudText Typo="Typo.body2" Style="color:var(--app-text-secondary); padding:16px;">No trades match these filters.</MudText>
-                </NoRecordsContent>
-                <PagerContent>
-                    <MudTablePager PageSizeOptions="PageSizes" />
-                </PagerContent>
-            </MudTable>
-        </section>
+        @* The filters only affect the grid, not the figures above it. *@
+        <RecentTradesPanel Trades="_accountTrades" Title="Recent trades" ShowStrategyFilter="_strategy is null" />
     }
 
 </div>

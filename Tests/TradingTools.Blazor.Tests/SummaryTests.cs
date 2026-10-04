@@ -26,7 +26,7 @@ namespace TradingTools.Blazor.Tests
         [Fact]
         public void Starting_balance_is_2000()
         {
-            DashboardStats.StartingBalance.Should().Be(2000);
+            DashboardStats.DefaultStartingBalance.Should().Be(2000);
         }
 
         #region Win rate

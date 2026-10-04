@@ -1,4 +1,5 @@
 using Models.Trades;
+using Shared.Enums;
 using SharedEnums.Enums;
 using TradingTools.Blazor.Services.AddOns;
 
@@ -17,6 +18,46 @@ namespace TradingTools.Blazor.Tests.AddOns
         [InlineData(EDirection.Short, 1000, 1000, 0)]
         public void Signed_points_come_from_the_direction_and_the_add_ons_prices(EDirection direction, double entry, double exit, double expected) =>
             TradeAddOns.SignedPoints(AddOn(entry, exit), direction).Should().Be(expected);
+
+        [Theory]
+        [InlineData(EDirection.Long, 1010, 1025, EOutcome.Win)]
+        [InlineData(EDirection.Long, 1020, 1015, EOutcome.Loss)]
+        [InlineData(EDirection.Short, 1010, 995, EOutcome.Win)]
+        [InlineData(EDirection.Short, 1000, 1004.5, EOutcome.Loss)]
+        [InlineData(EDirection.Long, 1000, 1000, EOutcome.Breakeven)]
+        [InlineData(EDirection.Short, 1000, 1000, EOutcome.Breakeven)]
+        public void An_add_ons_outcome_comes_from_its_prices_and_the_trades_direction(EDirection direction, double entry, double exit, EOutcome expected) =>
+            TradeAddOns.OutcomeOf(AddOn(entry, exit), direction).Should().Be(expected);
+
+        [Fact]
+        public void The_same_add_on_has_the_opposite_outcome_in_the_other_direction()
+        {
+            var addOn = AddOn(1000, 1020);
+
+            TradeAddOns.OutcomeOf(addOn, EDirection.Long).Should().Be(EOutcome.Win);
+            TradeAddOns.OutcomeOf(addOn, EDirection.Short).Should().Be(EOutcome.Loss);
+        }
+
+        [Theory]
+        [InlineData(null, 1000.0)]
+        [InlineData(1000.0, null)]
+        [InlineData(0.0, 1000.0)]
+        [InlineData(null, null)]
+        public void An_add_ons_outcome_is_unknown_without_both_prices(double? entry, double? exit) =>
+            TradeAddOns.OutcomeOf(AddOn(entry, exit), EDirection.Long).Should().BeNull();
+
+        [Fact]
+        public void An_add_ons_outcome_always_matches_the_sign_of_its_points()
+        {
+            foreach (var direction in new[] { EDirection.Long, EDirection.Short })
+            foreach (var (entry, exit) in new[] { (1000.0, 1010.0), (1010.0, 1000.0), (1000.0, 1000.0) })
+            {
+                var addOn = AddOn(entry, exit);
+                double points = TradeAddOns.SignedPoints(addOn, direction)!.Value;
+
+                TradeAddOns.OutcomeOf(addOn, direction).Should().Be(points > 0 ? EOutcome.Win : points < 0 ? EOutcome.Loss : EOutcome.Breakeven);
+            }
+        }
 
         [Fact]
         public void Signed_points_are_rounded_like_the_trades_pnl() =>

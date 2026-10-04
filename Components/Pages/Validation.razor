@@ -33,7 +33,8 @@
     {
         <MudText Typo="Typo.body2" Style="color:var(--app-text-secondary);">
             Last checked @report.CompletedAtUtc.ToLocalTime().ToString("HH:mm:ss", CultureInfo.InvariantCulture) ·
-            @report.TradesChecked trades checked ·
+            @report.TradesChecked trades checked on the @MyEnumConverter.TradeTypeFromEnum(report.Account) account
+            (the default account - change it in <a href="settings" style="color:var(--app-accent);">Settings</a>) ·
             @if (report.SkippedTradeId is not null)
             {
                 <span>the most recent trade is skipped as it may still be in progress</span>

@@ -7,12 +7,12 @@ namespace TradingTools.Blazor.Services.Dashboard
     {
         /// <summary>
         /// The accounts to choose from, whether or not they have trades yet. Each is a separate account
-        /// starting from <see cref="DashboardStats.StartingBalance"/>. Paper trading is no longer used.
+        /// starting from the account amount set on the Settings page. Paper trading is no longer used.
         /// </summary>
-        public static readonly IReadOnlyList<SampleSizeType> Accounts = [SampleSizeType.Trade, SampleSizeType.DemoTrading];
+        public static readonly IReadOnlyList<SampleSizeType> Accounts = Settings.SettingsDefaults.Accounts;
 
         /// <summary>Demo trading is the account currently traded (and the New Trade page's default).</summary>
-        public const SampleSizeType DefaultAccount = SampleSizeType.DemoTrading;
+        public const SampleSizeType DefaultAccount = Settings.SettingsDefaults.Account;
 
         /// <summary>The strategies to choose from; null means SRS and Espresso together.</summary>
         public static readonly IReadOnlyList<Strategy?> Strategies = [null, Strategy.SRS, Strategy.Espresso];

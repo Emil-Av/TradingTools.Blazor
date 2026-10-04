@@ -18,7 +18,8 @@ namespace TradingTools.Blazor.Services.Validation
     /// </summary>
     public static class TradeValidator
     {
-        public static IReadOnlyList<TradeValidationIssue> Validate(BaseTrade trade)
+        /// <param name="spread">The instrument's spread in points; it counts towards the net result a trade with add-ons is judged by.</param>
+        public static IReadOnlyList<TradeValidationIssue> Validate(BaseTrade trade, double spread = 0)
         {
             var issues = new List<TradeValidationIssue>();
 
@@ -27,7 +28,7 @@ namespace TradingTools.Blazor.Services.Validation
             // A trade with add-ons has one net result, which decides its outcome - the main position's exit
             // can be on the "wrong" side for the outcome (it won, the add-ons lost more).
             if (trade.AddOns.Count == 0) CheckExitSide(trade, issues);
-            else CheckNetOutcome(trade, issues);
+            else CheckNetOutcome(trade, spread, issues);
             CheckPnl(trade, issues);
             CheckAddOns(trade, issues);
 
@@ -148,9 +149,9 @@ namespace TradingTools.Blazor.Services.Validation
         /// a winning main position doesn't make a Win when the add-ons lose more. Nothing to check while a
         /// price, the amount or a volume is still missing - those are reported on their own.
         /// </summary>
-        private static void CheckNetOutcome(BaseTrade trade, List<TradeValidationIssue> issues)
+        private static void CheckNetOutcome(BaseTrade trade, double spread, List<TradeValidationIssue> issues)
         {
-            if (!Enum.IsDefined(trade.Outcome) || TradeNet.Calculate(trade) is not { } net) return;
+            if (!Enum.IsDefined(trade.Outcome) || TradeNet.Calculate(trade, spread) is not { } net) return;
             if (net.Outcome == trade.Outcome) return;
 
             issues.Add(new(nameof(BaseTrade.Outcome),

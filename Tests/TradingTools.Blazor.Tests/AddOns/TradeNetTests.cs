@@ -227,7 +227,7 @@ namespace TradingTools.Blazor.Tests.AddOns
             trade.Date = new DateOnly(2026, 9, 1);
             trade.Status = EStatus.Closed;
             trade.Symbol = "DAX";
-            return (await new DashboardService(TestUnitOfWork.Create([sampleSize], [trade])).GetTradesAsync()).Single();
+            return (await new DashboardService(TestUnitOfWork.Create([sampleSize], [trade]), TestSettings.NoSpreads()).GetTradesAsync()).Single();
         }
 
         [Fact]

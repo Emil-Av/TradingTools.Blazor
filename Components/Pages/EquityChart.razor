@@ -5,7 +5,7 @@
 
 @if (Points.Count < 2)
 {
-    <div class="app-flat" style="padding:40px 0; text-align:center; font-size:13px;">No trades with a euro result yet.</div>
+    <div class="app-flat" style="padding:40px 0; text-align:center; font-size:13px;">No trades with a euro result in this view yet.</div>
 }
 else
 {
@@ -21,9 +21,20 @@ else
                 }
     
                 @* Starting balance reference *@
-                <line x1="@F(Left)" x2="@F(W - Right)" y1="@F(Y(DashboardStats.StartingBalance))" y2="@F(Y(DashboardStats.StartingBalance))"
+                <line x1="@F(Left)" x2="@F(W - Right)" y1="@F(Y(StartBalance))" y2="@F(Y(StartBalance))"
                       stroke="var(--app-text-secondary)" stroke-dasharray="3 4" stroke-width="1" />
     
+                @* Where the curve was reset: the balance jumps to the amount entered then. *@
+                @for (int i = 1; i < Points.Count; i++)
+                {
+                    if (!Points[i].IsReset) continue;
+                    @* In a <g>: Razor would take an SVG <text> directly inside a code block for its own text tag. *@
+                    <g>
+                        <line x1="@F(X(i))" x2="@F(X(i))" y1="@F(EquityTop)" y2="@F(EquityBottom)" stroke="var(--app-text-secondary)" stroke-width="1" stroke-dasharray="1 4" />
+                        <text x="@F(X(i) + (NearRightEdge(i) ? -5 : 5))" y="@F(EquityTop + 9)" text-anchor="@(NearRightEdge(i) ? "end" : "start")" font-size="9.5" letter-spacing="1" fill="var(--app-text-secondary)">RESET</text>
+                    </g>
+                }
+
                 <path d="@_area" style="fill: color-mix(in srgb, var(--app-accent) 14%, transparent)" />
                 <path d="@_line" fill="none" stroke="var(--app-accent)" stroke-width="2" stroke-linejoin="round" />
     
@@ -51,7 +62,10 @@ else
 
 @code {
     /// <summary>The curve from <see cref="DashboardStats.EquityCurve"/>: the starting point first.</summary>
-    [Parameter, EditorRequired] public List<DashboardStats.EquityPoint> Points { get; set; } = [];
+    [Parameter, EditorRequired] public IReadOnlyList<DashboardStats.EquityPoint> Points { get; set; } = [];
+
+    /// <summary>The balance at the left end of the curve: the dashed reference line.</summary>
+    [Parameter, EditorRequired] public double StartBalance { get; set; }
 
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -95,10 +109,13 @@ else
                 Math.Round(Y(p.Balance), 2),
                 p.Date is { } date ? date.ToString("ddd, dd MMM yyyy", Inv) : "Start",
                 DashboardFormat.Euro(p.Balance),
-                i == 0 ? null : DashboardFormat.SignedEuro(result),
-                result);
+                i == 0 ? null : p.IsReset ? "Curve reset" : DashboardFormat.SignedEuro(result),
+                p.IsReset ? 0 : result);
         }));
     }
+
+    /// <summary>A reset near the right end of the chart gets its label on the left of its line, so it isn't cut off.</summary>
+    private bool NearRightEdge(int index) => X(index) > W - Right - 48;
 
     private double X(int index) => Left + (W - Left - Right) * index / _last;
     private double Y(double balance) => EquityBottom - (EquityBottom - EquityTop) * (balance - _low) / (_high - _low);

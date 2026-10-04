@@ -1,2 +1,35 @@
 @page "/history"
-<ComingSoonContent Title="History" />
+@rendermode InteractiveServer
+@using TradingTools.Blazor.Services.Dashboard
+
+<MudProviders />
+
+<PageTitle>History</PageTitle>
+
+<div class="app-content">
+
+    <TopBar Title="History" Subtitle="@($"{DashboardSelection.StrategyLabel(_strategy)} · every closed trade")">
+        <TradeSelectionSwitch @bind-SelectedStrategy="_strategy" @bind-SelectedStrategy:after="Refresh"
+                              @bind-SelectedAccount="_account" @bind-SelectedAccount:after="Refresh" />
+    </TopBar>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_trades.Count == 0)
+    {
+        <div class="app-card" style="padding:48px; text-align:center;">
+            <MudText Typo="Typo.h6">No trades yet</MudText>
+            <MudText Typo="Typo.body2" Style="color:var(--app-text-secondary); margin-top:6px;">
+                Closed @DashboardSelection.StrategyLabel(_strategy) trades on the @MyEnumConverter.TradeTypeFromEnum(_account) account will show up here.
+            </MudText>
+        </div>
+    }
+    else
+    {
+        @* The same grid, filters and summary line as the dashboard's Recent trades, with bigger pages. *@
+        <RecentTradesPanel Trades="_trades" Title="Trade history" PageSizes="PageSizes" InitialPageSize="50" ShowStrategyFilter="_strategy is null" />
+    }
+
+</div>

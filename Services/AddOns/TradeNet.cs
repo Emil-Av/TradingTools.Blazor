@@ -6,9 +6,10 @@ using TradingTools.Blazor.Services.Validation;
 namespace TradingTools.Blazor.Services.AddOns
 {
     /// <summary>The result of a whole trade in euro: the original position plus every add-on.</summary>
-    /// <param name="MainEuro">The original position: its points (signed by its prices and the direction) × the trade's amount.</param>
-    /// <param name="AddOnsEuro">Every add-on: its points (signed) × its volume.</param>
-    public sealed record TradeNetResult(double MainEuro, double AddOnsEuro)
+    /// <param name="MainEuro">The original position: its points (signed by its prices and the direction, minus the spread) × the trade's amount.</param>
+    /// <param name="AddOnsEuro">Every add-on: its points (signed, minus the spread) × its volume.</param>
+    /// <param name="SpreadEuro">What the spread cost over all positions; it is already taken off the two amounts above.</param>
+    public sealed record TradeNetResult(double MainEuro, double AddOnsEuro, double SpreadEuro = 0)
     {
         /// <summary>The whole trade, rounded to the cent.</summary>
         public double NetEuro => TradeNet.Cents(MainEuro + AddOnsEuro);
@@ -39,6 +40,19 @@ namespace TradingTools.Blazor.Services.AddOns
             return (exitPrice > entryPrice) == (direction == EDirection.Long) ? 1 : -1;
         }
 
+        /// <summary>
+        /// A position's own outcome from its prices and the direction: Win when it closed on the right side of
+        /// its entry, Loss on the wrong side, Breakeven at the entry. Null while a price is missing.
+        /// </summary>
+        public static EOutcome? OutcomeOf(double? entryPrice, double? exitPrice, EDirection direction) =>
+            ResultSign(entryPrice, exitPrice, direction) switch
+            {
+                > 0 => EOutcome.Win,
+                < 0 => EOutcome.Loss,
+                0 => EOutcome.Breakeven,
+                _ => null
+            };
+
         /// <summary>A position's result in points, signed from its prices and the direction; null when they don't say.</summary>
         public static double? SignedPoints(double? entryPrice, double? exitPrice, EDirection direction)
         {
@@ -48,23 +62,25 @@ namespace TradingTools.Blazor.Services.AddOns
 
         /// <summary>
         /// The net result of the trade, or null when a part of it is unknown (a missing price, amount or
-        /// volume) - a partly filled in trade has no result yet.
+        /// volume) - a partly filled in trade has no result yet. <paramref name="spread"/> is the instrument's
+        /// spread in points, taken off every position (the main one and each add-on) before its volume is applied.
         /// </summary>
-        public static TradeNetResult? Calculate(BaseTrade trade) =>
-            Calculate(trade.Direction, trade.EntryPrice, trade.ExitPrice, trade.Amount, trade.AddOns);
+        public static TradeNetResult? Calculate(BaseTrade trade, double spread = 0) =>
+            Calculate(trade.Direction, trade.EntryPrice, trade.ExitPrice, trade.Amount, trade.AddOns, spread);
 
-        public static TradeNetResult? Calculate(EDirection direction, double? entryPrice, double? exitPrice, double? amount, IEnumerable<TradeAddOn> addOns)
+        public static TradeNetResult? Calculate(EDirection direction, double? entryPrice, double? exitPrice, double? amount, IEnumerable<TradeAddOn> addOns, double spread = 0)
         {
             if (amount is not > 0 || SignedPoints(entryPrice, exitPrice, direction) is not { } mainPoints) return null;
 
-            double addOnsEuro = 0;
+            double addOnsEuro = 0, totalVolume = amount.Value;
             foreach (var addOn in addOns)
             {
                 if (addOn.Volume is not > 0 || SignedPoints(addOn.EntryPrice, addOn.ExitPrice, direction) is not { } points) return null;
-                addOnsEuro += points * addOn.Volume.Value;
+                addOnsEuro += (points - spread) * addOn.Volume.Value;
+                totalVolume += addOn.Volume.Value;
             }
 
-            return new TradeNetResult(mainPoints * amount.Value, addOnsEuro);
+            return new TradeNetResult((mainPoints - spread) * amount.Value, addOnsEuro, spread * totalVolume);
         }
     }
 }

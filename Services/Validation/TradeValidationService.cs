@@ -2,6 +2,7 @@ using DataAccess.Repository.IRepository;
 using Models.Trades;
 using SharedEnums.Enums;
 using TradingTools.Blazor.Services.AddOns;
+using TradingTools.Blazor.Services.Settings;
 
 namespace TradingTools.Blazor.Services.Validation
 {
@@ -20,9 +21,11 @@ namespace TradingTools.Blazor.Services.Validation
         int TradeNumber,
         IReadOnlyList<TradeValidationIssue> Issues);
 
-    /// <param name="SkippedTradeId">The most recent trade, which isn't validated because it may still be in progress.</param>
+    /// <param name="Account">The account the check covered: the default account (Settings page).</param>
+    /// <param name="SkippedTradeId">The most recent trade of that account, which isn't validated because it may still be in progress.</param>
     public sealed record TradeValidationReport(
         DateTime CompletedAtUtc,
+        SampleSizeType Account,
         int TradesChecked,
         int? SkippedTradeId,
         IReadOnlyList<InvalidTrade> InvalidTrades);
@@ -33,18 +36,22 @@ namespace TradingTools.Blazor.Services.Validation
     }
 
     /// <summary>
-    /// Validates every trade shown on the Trades page (all non-research sample sizes) except the most
-    /// recent one, which may still be open.
+    /// Validates every trade of the default account (the Settings page: Demo Trading or Trade) except the most
+    /// recent one of that account, which may still be open.
     /// </summary>
-    public class TradeValidationService(IUnitOfWork unitOfWork, TimeProvider timeProvider) : ITradeValidationService
+    public class TradeValidationService(IUnitOfWork unitOfWork, ISettingsService settings, TimeProvider timeProvider) : ITradeValidationService
     {
         private readonly IUnitOfWork _unitOfWork = unitOfWork;
+        private readonly ISettingsService _settings = settings;
         private readonly TimeProvider _timeProvider = timeProvider;
 
         public async Task<TradeValidationReport> ValidateAllAsync(CancellationToken cancellationToken = default)
         {
+            // Only the default account's trades (Demo Trading or Trade): the other account isn't looked at.
+            var account = await _settings.GetDefaultAccountAsync(cancellationToken);
+
             var trades = await _unitOfWork.BaseTrade.GetAllAsync(
-                t => t.SampleSize!.SampleSizeType != SampleSizeType.Research,
+                t => t.SampleSize!.SampleSizeType == account,
                 includeProperties: "SampleSize," + TradeAddOns.Include);
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -61,11 +68,14 @@ namespace TradingTools.Blazor.Services.Validation
                 .OrderBy(t => t.Date).ThenBy(t => t.CreatedAt).ThenBy(t => t.Id)
                 .LastOrDefault();
 
+            // The spread counts towards the net result a trade with add-ons is judged by.
+            var spreads = await _settings.GetSpreadsAsync(cancellationToken);
+
             var invalid = new List<InvalidTrade>();
             foreach (var trade in trades.Where(t => t != skipped).OrderBy(t => t.Date).ThenBy(t => t.CreatedAt).ThenBy(t => t.Id))
             {
                 trade.SortAddOns();
-                var issues = TradeValidator.Validate(trade);
+                var issues = TradeValidator.Validate(trade, spreads.For(trade.Symbol));
                 if (issues.Count == 0) continue;
 
                 invalid.Add(new InvalidTrade(
@@ -83,6 +93,7 @@ namespace TradingTools.Blazor.Services.Validation
 
             return new TradeValidationReport(
                 _timeProvider.GetUtcNow().UtcDateTime,
+                account,
                 trades.Count - (skipped is null ? 0 : 1),
                 skipped?.Id,
                 invalid);

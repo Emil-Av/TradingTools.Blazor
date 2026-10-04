@@ -12,6 +12,7 @@
     <!-- Kept below 8.0 on purpose: 7.x is Apache-2.0 (free for any use); from 8.0 FluentAssertions is
          under Xceed's Community License, free only for non-commercial use, otherwise paid. -->
     <PackageReference Include="FluentAssertions" Version="[7.2.2, 8.0.0)" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.10" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.10.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageReference Include="NSubstitute" Version="6.2.0" />

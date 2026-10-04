@@ -1,0 +1,34 @@
+@using TradingTools.Blazor.Services.Dashboard
+@using SharedEnums.Enums
+@using Shared.Enums
+@* The two switches in the heading of the Dashboard and History pages: which strategy (both or one) and which
+   account (Trade or Demo Trading), used as
+   <TradeSelectionSwitch @bind-SelectedStrategy="_strategy" @bind-SelectedStrategy:after="Refresh"
+                         @bind-SelectedAccount="_account" @bind-SelectedAccount:after="Refresh" /> *@
+<div class="app-seg-group">
+    <div class="app-seg" role="group" aria-label="Strategy">
+        @foreach (var strategy in DashboardSelection.Strategies)
+        {
+            <button type="button" aria-pressed="@(strategy == SelectedStrategy ? "true" : "false")" @onclick="() => SelectedStrategyChanged.InvokeAsync(strategy)">
+                @DashboardSelection.StrategyLabel(strategy)
+            </button>
+        }
+    </div>
+    <div class="app-seg" role="group" aria-label="Account">
+        @foreach (var account in DashboardSelection.Accounts)
+        {
+            <button type="button" aria-pressed="@(account == SelectedAccount ? "true" : "false")" @onclick="() => SelectedAccountChanged.InvokeAsync(account)">
+                @MyEnumConverter.TradeTypeFromEnum(account)
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    /// <summary>The selected strategy; null means SRS and Espresso together.</summary>
+    [Parameter] public Strategy? SelectedStrategy { get; set; }
+    [Parameter] public EventCallback<Strategy?> SelectedStrategyChanged { get; set; }
+
+    [Parameter] public SampleSizeType SelectedAccount { get; set; }
+    [Parameter] public EventCallback<SampleSizeType> SelectedAccountChanged { get; set; }
+}

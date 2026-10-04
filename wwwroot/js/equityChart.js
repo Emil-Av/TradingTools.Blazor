@@ -1,4 +1,4 @@
-// Hover read-out and full screen for the dashboard's equity curve (Components/Pages/EquityChart.razor).
+// Hover read-out for the dashboard's equity curve (Components/Pages/EquityChart.razor).
 // Everything runs in the browser: moving the mouse never goes over the Blazor circuit. The listeners
 // sit on the document, so they keep working when Blazor re-renders or replaces the chart (switching
 // account or strategy) and across enhanced navigation.
@@ -76,42 +76,7 @@
     document.documentElement.addEventListener('mouseleave', hide); // the mouse left the window
     window.addEventListener('blur', hide);
 
-    // Full screen: the browser's own full-screen mode where it exists; otherwise (e.g. iPhone Safari,
-    // which only allows it for videos) the card is stretched over the window with CSS.
-    window.appEquityChart = {
-        toggleFullscreen: function (button) {
-            const card = button.closest('.app-equity-card');
-            if (!card) return;
-            hide();
-            if (document.fullscreenElement) {
-                document.exitFullscreen();
-            } else if (card.classList.contains('is-maximized')) {
-                card.classList.remove('is-maximized');
-            } else if (card.requestFullscreen && document.fullscreenEnabled) {
-                // Some embedded browsers neither grant nor refuse the request - fall back if nothing happened.
-                let settled = false;
-                card.requestFullscreen().then(
-                    function () { settled = true; },
-                    function () { settled = true; card.classList.add('is-maximized'); });
-                setTimeout(function () {
-                    if (!settled && document.fullscreenElement !== card) card.classList.add('is-maximized');
-                }, 800);
-            } else {
-                card.classList.add('is-maximized');
-            }
-        }
-    };
-
-    // Entering or leaving real full screen (Esc, the button, the browser's own UI) clears the fallback.
-    document.addEventListener('fullscreenchange', function () {
-        hide();
-        document.querySelectorAll('.app-equity-card.is-maximized').forEach(function (card) { card.classList.remove('is-maximized'); });
-    });
-
-    // Esc also closes the CSS fallback (the browser handles Esc for real full screen itself).
-    document.addEventListener('keydown', function (event) {
-        if (event.key !== 'Escape') return;
-        hide(); // the chart changes size, so the read-out would be left in the wrong place
-        document.querySelectorAll('.app-equity-card.is-maximized').forEach(function (card) { card.classList.remove('is-maximized'); });
-    });
+    // The chart changes size when it enters or leaves full screen (wwwroot/js/fullscreen.js), so the hover
+    // read-out would be left in the wrong place.
+    document.addEventListener('appfullscreenchange', hide);
 })();

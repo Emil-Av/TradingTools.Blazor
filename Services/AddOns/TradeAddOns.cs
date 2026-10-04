@@ -1,4 +1,5 @@
 using Models.Trades;
+using Shared.Enums;
 using SharedEnums.Enums;
 using TradingTools.Blazor.Services.Validation;
 
@@ -26,10 +27,17 @@ namespace TradingTools.Blazor.Services.AddOns
         public static TradeAddOn NewFor(BaseTrade trade) => new() { BaseTradeId = trade.Id, ExitPrice = trade.ExitPrice };
 
         /// <summary>
-        /// The add-on's result in points, signed: positive when it made money. Unlike the trade itself
-        /// (whose sign comes from its Outcome), an add-on has no outcome of its own, so the sign comes
-        /// from the trade's direction and the add-on's prices: a long add-on wins when it's closed
-        /// above its entry, a short one when it's closed below. Null when either price is missing.
+        /// The add-on's own outcome, worked out from its entry and exit and the trade's direction - never
+        /// entered by hand and not stored, so it can't disagree with the prices. This is the add-on alone: the
+        /// trade's Outcome is its net result (see <see cref="TradeNet"/>). Null while a price is missing.
+        /// </summary>
+        public static EOutcome? OutcomeOf(TradeAddOn addOn, EDirection direction) =>
+            TradeNet.OutcomeOf(addOn.EntryPrice, addOn.ExitPrice, direction);
+
+        /// <summary>
+        /// The add-on's result in points, signed: positive when it made money. An add-on's sign comes from the
+        /// trade's direction and its own prices: a long add-on wins when it's closed above its entry, a short
+        /// one when it's closed below. Null when either price is missing.
         /// </summary>
         public static double? SignedPoints(TradeAddOn addOn, EDirection direction) =>
             TradeNet.SignedPoints(addOn.EntryPrice, addOn.ExitPrice, direction);

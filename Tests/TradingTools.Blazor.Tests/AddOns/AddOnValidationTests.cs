@@ -99,7 +99,7 @@ namespace TradingTools.Blazor.Tests.AddOns
             newer.SampleSizeId = 1;
             newer.Date = trade.Date.AddDays(1); // the most recent trade isn't checked
 
-            var report = await new TradeValidationService(TestUnitOfWork.Create([sampleSize], [trade, newer]), TimeProvider.System).ValidateAllAsync();
+            var report = await new TradeValidationService(TestUnitOfWork.Create([sampleSize], [trade, newer]), TestSettings.NoSpreads(), TimeProvider.System).ValidateAllAsync();
 
             report.InvalidTrades.Should().ContainSingle().Which.Issues.Should().ContainSingle()
                 .Which.Message.Should().Be("Add-on 1: volume is missing.");

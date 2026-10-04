@@ -49,7 +49,7 @@ namespace TradingTools.Blazor.Tests
         }
 
         private static Task<List<DashboardTrade>> Load(IEnumerable<SampleSize> sampleSizes, params BaseTrade[] trades) =>
-            new DashboardService(TestUnitOfWork.Create(sampleSizes, trades)).GetTradesAsync();
+            new DashboardService(TestUnitOfWork.Create(sampleSizes, trades), TestSettings.NoSpreads()).GetTradesAsync();
 
         [Fact]
         public async Task Only_closed_srs_and_espresso_trades_outside_research_are_included()

@@ -11,6 +11,8 @@ using Shared.Enums;
 using SharedEnums.Enums;
 using TradingTools.Blazor.Services;
 using TradingTools.Blazor.Services.AddOns;
+using TradingTools.Blazor.Services.Calculation;
+using TradingTools.Blazor.Services.Settings;
 using TradingTools.Blazor.Services.Interfaces;
 using TradingTools.Blazor.Services.Validation;
 
@@ -24,6 +26,7 @@ namespace TradingTools.Blazor.Components.Pages
         [Inject] private Ganss.Xss.IHtmlSanitizer HtmlSanitizer { get; set; } = default!;
         [Inject] private IJSRuntime JS { get; set; } = default!;
         [Inject] private ITradeValidationMonitor ValidationMonitor { get; set; } = default!;
+        [Inject] private ISettingsService SettingsService { get; set; } = default!;
 
         /// <summary>Opens this trade directly, e.g. from the Data check page (/trades?tradeId=123).</summary>
         [SupplyParameterFromQuery] public int? TradeId { get; set; }
@@ -59,9 +62,18 @@ namespace TradingTools.Blazor.Components.Pages
 
         #region Validation and P&L
 
+        // The spread of each instrument (Settings page): taken off every position's result.
+        private SpreadTable _spreads = SpreadTable.None;
+
+        /// <summary>The spread in points of the trade on screen's instrument; 0 when it has none.</summary>
+        private double CurrentSpread => _spreads.For(CurrentBase?.Symbol);
+
+        /// <summary>What the trade on screen won or lost with the spread taken off - the same calculation as the dashboard and the history.</summary>
+        private TradeResultSummary? CurrentResult => CurrentBase is null ? null : TradeResults.Calculate(CurrentBase, CurrentSpread);
+
         /// <summary>Live validation of the trade on screen - the same rules as the Data check page.</summary>
         private IReadOnlyList<TradeValidationIssue> CurrentIssues =>
-            CurrentBase is null ? [] : TradeValidator.Validate(CurrentBase);
+            CurrentBase is null ? [] : TradeValidator.Validate(CurrentBase, CurrentSpread);
 
         /// <summary>The most recent trade isn't flagged on the Data check page since it may still be in progress.</summary>
         private bool CurrentIsMostRecentTrade =>
@@ -104,7 +116,7 @@ namespace TradingTools.Blazor.Components.Pages
         private string? AddOnIssue(int index, string property) => IssueFor(TradeValidator.AddOnField(index, property));
 
         /// <summary>The whole trade's result in euro (main position + add-ons); null without add-ons or while something is missing.</summary>
-        private TradeNetResult? CurrentNet => CurrentBase is { AddOns.Count: > 0 } trade ? TradeNet.Calculate(trade) : null;
+        private TradeNetResult? CurrentNet => CurrentBase is { AddOns.Count: > 0 } trade ? TradeNet.Calculate(trade, CurrentSpread) : null;
 
         /// <summary>
         /// With add-ons the Outcome is the net result of the whole trade, so it follows the prices, amount,
@@ -159,6 +171,8 @@ namespace TradingTools.Blazor.Components.Pages
 
         protected override async Task OnInitializedAsync()
         {
+            _spreads = await SettingsService.GetSpreadsAsync();
+
             if (TradeId is { } tradeId && await TradesService.GetSampleSizeIdOfTradeAsync(tradeId) is { } sampleSizeId)
             {
                 _vm = await TradesService.LoadSampleSizeNumberAsync(sampleSizeId);

@@ -1,5 +1,6 @@
 @page "/new-trade"
 @rendermode InteractiveServer
+@using TradingTools.Blazor.Services.AddOns
 @using TradingTools.Blazor.Services.Dashboard
 
 <MudProviders />
@@ -152,6 +153,7 @@
                             <MudNumericField T="double?" Value="addOn.ExitPrice" ValueChanged="@(v => OnAddOnExitChanged(addOn, v))" Immediate="true" Label="Exit Price" Variant="Variant.Outlined" Format="F2" />
                             <MudNumericField T="double?" @bind-Value="addOn.Volume" @bind-Value:after="RecalculateOutcome" Label="Volume" Variant="Variant.Outlined" />
                             <MudNumericField T="double?" @bind-Value="addOn.PnL" Label="P&amp;L (points)" HelperText="Filled in from |exit − entry|" Variant="Variant.Outlined" Format="F2" />
+                            <AddOnOutcome Outcome="@TradeAddOns.OutcomeOf(addOn, _direction)" />
                             <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" aria-label="Remove add-on" Style="margin-top:10px;" OnClick="@(() => RemoveAddOn(addOn))" />
                         </div>
                     }
@@ -161,7 +163,7 @@
                         <div class="app-addon-net">
                             @if (Net is { } net)
                             {
-                                <span>Net result of the whole trade</span>
+                                <span>Net result after spread</span>
                                 <span class="app-mono @DashboardFormat.ToneClass(net.NetEuro)">@DashboardFormat.SignedEuro(net.NetEuro)</span>
                                 <span>&rarr; <strong>@net.Outcome</strong></span>
                                 <span class="app-addon-net-parts">main <span class="app-mono">@DashboardFormat.SignedEuro(net.MainEuro)</span> · add-ons <span class="app-mono">@DashboardFormat.SignedEuro(net.AddOnsEuro)</span></span>

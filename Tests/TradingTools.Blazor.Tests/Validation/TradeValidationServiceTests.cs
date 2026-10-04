@@ -44,7 +44,7 @@ namespace TradingTools.Blazor.Tests.Validation
         }
 
         private static Task<TradeValidationReport> Run(IEnumerable<SampleSize> sampleSizes, params BaseTrade[] trades) =>
-            new TradeValidationService(TestUnitOfWork.Create(sampleSizes, trades), new FakeTimeProvider(Now)).ValidateAllAsync();
+            new TradeValidationService(TestUnitOfWork.Create(sampleSizes, trades), TestSettings.NoSpreads(), new FakeTimeProvider(Now)).ValidateAllAsync();
 
         [Fact]
         public async Task Only_invalid_trades_are_listed_with_their_problems()

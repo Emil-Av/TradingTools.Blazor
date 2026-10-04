@@ -4,13 +4,15 @@ using Shared.Enums;
 using SharedEnums.Enums;
 using TradingTools.Blazor.Services.AddOns;
 using TradingTools.Blazor.Services.Interfaces;
-using TradingTools.Blazor.Services.Validation;
+using TradingTools.Blazor.Services.Calculation;
+using TradingTools.Blazor.Services.Settings;
 
 namespace TradingTools.Blazor.Services.Dashboard
 {
-    public class DashboardService(IUnitOfWork unitOfWork) : IDashboardService
+    public class DashboardService(IUnitOfWork unitOfWork, ISettingsService settings) : IDashboardService
     {
         private readonly IUnitOfWork _unitOfWork = unitOfWork;
+        private readonly ISettingsService _settings = settings;
 
         public async Task<List<DashboardTrade>> GetTradesAsync()
         {
@@ -28,6 +30,10 @@ namespace TradingTools.Blazor.Services.Dashboard
             // trades are all still open keeps its place.
             var sampleSizeNumbers = SampleSizeNumbering.Number(sampleSizes);
 
+            // The spread of each instrument is taken off every position's result, here and nowhere else, so the
+            // dashboard and the History page (which both use this list) always agree with the Trades page.
+            var spreads = await _settings.GetSpreadsAsync();
+
             return [.. trades
                 .OrderBy(t => t.Date).ThenBy(t => t.CreatedAt).ThenBy(t => t.Id)
                 .Select(t => new DashboardTrade(
@@ -42,51 +48,17 @@ namespace TradingTools.Blazor.Services.Dashboard
                     t.SampleSizeId,
                     sampleSizeNumbers[t.SampleSizeId],
                     t.Amount,
-                    SignedPoints(t),
+                    TradeResults.MainPointsAfterSpread(t, spreads.For(t.Symbol)),
                     t.Outcome)
                 {
                     AddOns = [.. t.AddOns
                         .OrderBy(a => a.Id)
-                        .Select(a => new DashboardAddOn(TradeAddOns.SignedPoints(a, t.Direction), a.Volume))]
+                        .Select(a => new DashboardAddOn(TradeResults.AddOnPointsAfterSpread(a, t.Direction, spreads.For(t.Symbol)), a.Volume))]
                 })];
         }
 
-        /// <summary>
-        /// The trade's result in points, signed by its outcome. The recorded P&amp;L field holds the
-        /// points as a positive number (the sign lives in Outcome), so it's the primary source. It
-        /// falls back to |exit - entry| only when P&amp;L wasn't filled in - the Direction field isn't
-        /// reliable enough to derive the sign from prices, so Outcome decides it either way.
-        /// A win/loss with 0 points is treated as not filled in rather than as a 0-point result.
-        ///
-        /// With add-ons the Outcome belongs to the whole trade (its net result), not to the main position:
-        /// the main position can win while the add-ons lose more. So there its sign comes from its prices and
-        /// the direction, like the add-ons' do - and a "breakeven" trade still counts the main position's own points.
-        /// </summary>
-        internal static double? SignedPoints(BaseTrade trade)
-        {
-            if (trade.AddOns.Count > 0) return MainPositionPoints(trade);
-
-            if (trade.Outcome == EOutcome.Breakeven) return 0;
-
-            double? magnitude =
-                trade.PnL is { } pnl && pnl != 0 ? Math.Abs(pnl)
-                : trade.EntryPrice is > 0 && trade.ExitPrice is > 0 && trade.ExitPrice != trade.EntryPrice
-                    ? Math.Abs(trade.ExitPrice.Value - trade.EntryPrice.Value)
-                    : null;
-
-            if (magnitude is null) return null;
-            return trade.Outcome == EOutcome.Win ? magnitude : -magnitude;
-        }
-
-        /// <summary>The main position of a trade with add-ons: signed by its prices and direction; null when they don't say.</summary>
-        private static double? MainPositionPoints(BaseTrade trade)
-        {
-            if (TradeNet.ResultSign(trade.EntryPrice, trade.ExitPrice, trade.Direction) is not { } sign) return null;
-            if (sign == 0) return 0;
-
-            double? magnitude = trade.PnL is { } pnl && pnl != 0 ? Math.Abs(pnl) : TradePnl.Points(trade.EntryPrice, trade.ExitPrice);
-            return sign * magnitude;
-        }
+        /// <summary>The main position's result in points before the spread (see <see cref="TradeResults.MainPoints"/>).</summary>
+        internal static double? SignedPoints(BaseTrade trade) => TradeResults.MainPoints(trade);
 
         private static string NormalizeSymbol(string? symbol) =>
             string.IsNullOrWhiteSpace(symbol) ? "Unknown" : symbol.Trim().ToUpperInvariant();

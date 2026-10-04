@@ -5,6 +5,12 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
+    @* The brand mark from the menu bar: an SVG for current browsers, an .ico for the rest (browsers also ask for
+       /favicon.ico by themselves), and a PNG for the iOS home screen. *@
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="favicon.ico" sizes="48x48" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <meta name="theme-color" content="#0d1217" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@1,6..96,500;1,6..96,700&family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Spline+Sans+Mono:wght@400;500;600&display=swap">
     <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
@@ -27,6 +33,7 @@
     <script src="_content/Radzen.Blazor/Radzen.Blazor.js"></script>
     <script src="js/fileUpload.js"></script>
     <script src="js/dropdowns.js"></script>
+    <script src="js/fullscreen.js"></script>
     <script src="js/equityChart.js"></script>
 </body>
 
