@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 26 26" width="64" height="64">
+  <!-- The brand mark from the menu bar (Components/Layout/NavMenu.razor): a gain stroke and a loss stroke mirrored
+       across a centre axis, in the app's colours (Theme/AppTheme.cs), on its dark background. -->
+  <rect width="26" height="26" rx="6" fill="#0d1217"/>
+  <rect x="12.25" y="3" width="1.5" height="20" rx=".75" fill="#e2e8ee"/>
+  <path d="M3.5 17 L7.5 10.5 L10.5 13.5" fill="none" stroke="#5aa8ea" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M22.5 9 L18.5 15.5 L15.5 12.5" fill="none" stroke="#f08b3e" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -5,4 +5,5 @@
   <Project Path="../TradingToolsRazor/Statistics/Statistics.csproj" />
   <Project Path="../TradingToolsRazor/Utilities/Utilities.csproj" />
   <Project Path="TradingTools.Blazor.csproj" />
+  <Project Path="Tests/TradingTools.Blazor.Tests/TradingTools.Blazor.Tests.csproj" />
 </Solution>

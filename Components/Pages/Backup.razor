@@ -1,0 +1,84 @@
+@page "/backup"
+@using TradingTools.Blazor.Services.DataBackup
+@* Static (not interactive) on purpose: exports are plain downloads and imports are plain form posts to
+   the /backup endpoints (BackupEndpoints.cs), so large files go straight through the browser instead
+   of over the SignalR circuit. The endpoints redirect back here with ?message= or ?error=. *@
+
+<PageTitle>Backup</PageTitle>
+
+<div class="app-content">
+
+    <TopBar Title="Backup" Subtitle="Export or restore the database and the screenshots. They're separate files - keep both to restore everything." />
+
+    @if (!string.IsNullOrEmpty(Message))
+    {
+        <MudAlert Severity="Severity.Success" Variant="Variant.Outlined">@Message</MudAlert>
+    }
+    @if (!string.IsNullOrEmpty(Error))
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">@Error</MudAlert>
+    }
+
+    <div class="app-card" style="padding:24px;">
+        <MudText Typo="Typo.subtitle1" Style="font-weight:700;">Export</MudText>
+        <MudText Typo="Typo.body2" Style="color:var(--app-text-secondary); margin:4px 0 16px;">
+            The database is exported as a PostgreSQL dump (.dump), the screenshots as a .zip. Large exports can take a moment to start downloading.
+        </MudText>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            @* data-enhance-nav="false": let the browser handle the download instead of Blazor's enhanced navigation. *@
+            <a class="app-btn-primary" href="@(BackupEndpoints.PagePath)/export/database" data-enhance-nav="false">
+                <MudIcon Icon="@Icons.Material.Filled.Storage" Size="Size.Small" /> Export database
+            </a>
+            <a class="app-btn-primary" href="@(BackupEndpoints.PagePath)/export/screenshots" data-enhance-nav="false">
+                <MudIcon Icon="@Icons.Material.Filled.PhotoLibrary" Size="Size.Small" /> Export screenshots
+            </a>
+        </div>
+    </div>
+
+    <div class="app-card" style="padding:24px;">
+        <MudText Typo="Typo.subtitle1" Style="font-weight:700;">Import database</MudText>
+        <MudText Typo="Typo.body2" Style="color:var(--app-text-secondary); margin:4px 0 16px;">
+            Replaces the whole database - trades, journals, reviews and user accounts - with the dump. Accepts the .dump files exported above, or a plain .sql dump.
+            The import runs as one transaction: if it fails, nothing is changed.
+        </MudText>
+        <form class="app-backup-form" method="post" action="@(BackupEndpoints.PagePath)/import/database" enctype="multipart/form-data"
+              onsubmit="this.querySelector('button').disabled = true; this.querySelector('.app-backup-busy').hidden = false;">
+            <AntiforgeryToken />
+            <input class="app-backup-file" type="file" name="file" accept=".dump,.backup,.sql" required />
+            <label class="app-backup-confirm">
+                <input type="checkbox" name="confirm" value="true" required />
+                I understand this overwrites all data in the database.
+            </label>
+            <div style="display:flex; align-items:center; gap:12px;">
+                <button type="submit" class="app-btn-primary app-btn-danger">
+                    <MudIcon Icon="@Icons.Material.Filled.Upload" Size="Size.Small" /> Import database
+                </button>
+                <span class="app-backup-busy" hidden>Uploading and restoring - keep this page open…</span>
+            </div>
+        </form>
+    </div>
+
+    <div class="app-card" style="padding:24px;">
+        <MudText Typo="Typo.subtitle1" Style="font-weight:700;">Import screenshots</MudText>
+        <MudText Typo="Typo.body2" Style="color:var(--app-text-secondary); margin:4px 0 16px;">
+            Extracts a .zip into the screenshots folder, overwriting files with the same path. Works with the .zip exported above, and with zips whose top folder is Screenshots or ScreenshotsDev.
+        </MudText>
+        <form class="app-backup-form" method="post" action="@(BackupEndpoints.PagePath)/import/screenshots" enctype="multipart/form-data"
+              onsubmit="this.querySelector('button').disabled = true; this.querySelector('.app-backup-busy').hidden = false;">
+            <AntiforgeryToken />
+            <input class="app-backup-file" type="file" name="file" accept=".zip" required />
+            <div style="display:flex; align-items:center; gap:12px;">
+                <button type="submit" class="app-btn-primary">
+                    <MudIcon Icon="@Icons.Material.Filled.Upload" Size="Size.Small" /> Import screenshots
+                </button>
+                <span class="app-backup-busy" hidden>Uploading and extracting - keep this page open…</span>
+            </div>
+        </form>
+    </div>
+
+</div>
+
+@code {
+    [SupplyParameterFromQuery] public string? Message { get; set; }
+    [SupplyParameterFromQuery] public string? Error { get; set; }
+}

@@ -1,0 +1,136 @@
+@using System.Globalization
+@using TradingTools.Blazor.Services.Dashboard
+@* The dashboard's equity curve: the balance after each trade. Plain SVG; the hover read-out is drawn by
+   wwwroot/js/equityChart.js from the points in data-points, entirely in the browser. *@
+
+@if (Points.Count < 2)
+{
+    <div class="app-flat" style="padding:40px 0; text-align:center; font-size:13px;">No trades with a euro result in this view yet.</div>
+}
+else
+{
+    <div class="app-equity">
+        <div class="app-equity-scroll">
+            <svg class="app-equity-plot" viewBox="0 0 @W @H" role="img" aria-label="Balance after each trade" data-points="@_hoverPoints">
+                @foreach (var tick in _ticks)
+                {
+                    <g>
+                        <line x1="@F(Left)" x2="@F(W - Right)" y1="@F(Y(tick))" y2="@F(Y(tick))" stroke="var(--app-border)" stroke-width="1" />
+                        <text x="@F(Left - 8)" y="@F(Y(tick) + 4)" text-anchor="end" font-size="11" fill="var(--app-text-secondary)">€@tick.ToString("N0", Inv)</text>
+                    </g>
+                }
+    
+                @* Starting balance reference *@
+                <line x1="@F(Left)" x2="@F(W - Right)" y1="@F(Y(StartBalance))" y2="@F(Y(StartBalance))"
+                      stroke="var(--app-text-secondary)" stroke-dasharray="3 4" stroke-width="1" />
+    
+                @* Where the curve was reset: the balance jumps to the amount entered then. *@
+                @for (int i = 1; i < Points.Count; i++)
+                {
+                    if (!Points[i].IsReset) continue;
+                    @* In a <g>: Razor would take an SVG <text> directly inside a code block for its own text tag. *@
+                    <g>
+                        <line x1="@F(X(i))" x2="@F(X(i))" y1="@F(EquityTop)" y2="@F(EquityBottom)" stroke="var(--app-text-secondary)" stroke-width="1" stroke-dasharray="1 4" />
+                        <text x="@F(X(i) + (NearRightEdge(i) ? -5 : 5))" y="@F(EquityTop + 9)" text-anchor="@(NearRightEdge(i) ? "end" : "start")" font-size="9.5" letter-spacing="1" fill="var(--app-text-secondary)">RESET</text>
+                    </g>
+                }
+
+                <path d="@_area" style="fill: color-mix(in srgb, var(--app-accent) 14%, transparent)" />
+                <path d="@_line" fill="none" stroke="var(--app-accent)" stroke-width="2" stroke-linejoin="round" />
+    
+                @* Emphasised endpoint *@
+                <circle cx="@F(X(_last))" cy="@F(Y(Points[_last].Balance))" r="4.5" fill="var(--app-surface)" stroke="var(--app-accent)" stroke-width="2" />
+                <text x="@F(X(_last) - 10)" y="@F(Y(Points[_last].Balance) - 10)" text-anchor="end" font-size="12" font-weight="600" fill="var(--app-text-primary)">@DashboardFormat.Euro(Points[_last].Balance)</text>
+    
+                <text x="@F(Left)" y="@F(H - 4)" font-size="10.5" fill="var(--app-text-secondary)">@DateLabel(Points[1].Date)</text>
+                <text x="@F(W - Right)" y="@F(H - 4)" text-anchor="end" font-size="10.5" fill="var(--app-text-secondary)">@DateLabel(Points[_last].Date)</text>
+    
+                @* Hover crosshair, positioned by equityChart.js *@
+                <g class="app-equity-hover" visibility="hidden" pointer-events="none">
+                    <line y1="@F(EquityTop)" y2="@F(EquityBottom)" stroke="var(--app-text-secondary)" stroke-width="1" stroke-dasharray="2 3" />
+                    <circle r="4.5" fill="var(--app-surface)" stroke="var(--app-accent)" stroke-width="2" />
+                </g>
+            </svg>
+        </div>
+        <div class="app-equity-tip" aria-hidden="true">
+            <span class="app-equity-tip-date"></span>
+            <span class="app-equity-tip-balance"></span>
+            <span class="app-equity-tip-result"></span>
+        </div>
+    </div>
+}
+
+@code {
+    /// <summary>The curve from <see cref="DashboardStats.EquityCurve"/>: the starting point first.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<DashboardStats.EquityPoint> Points { get; set; } = [];
+
+    /// <summary>The balance at the left end of the curve: the dashed reference line.</summary>
+    [Parameter, EditorRequired] public double StartBalance { get; set; }
+
+    private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
+
+    // Geometry in viewBox units; the dates go under the chart.
+    private const double W = 800, H = 300, Left = 64, Right = 18;
+    private const double EquityTop = 14, EquityBottom = 272;
+
+    private int _last;
+    private double _low, _high;
+    private List<double> _ticks = [];
+    private string _line = "", _area = "";
+
+    /// <summary>
+    /// For the hover read-out: per point its position (x, y in viewBox units), date, balance and that
+    /// trade's result (text r, number t). The starting point has no result.
+    /// </summary>
+    private string _hoverPoints = "[]";
+    private sealed record HoverPoint(double x, double y, string d, string b, string? r, double t);
+
+    protected override void OnParametersSet()
+    {
+        if (Points.Count < 2) return;
+        _last = Points.Count - 1;
+
+        var balances = Points.Select(p => p.Balance).ToList();
+        double step = NiceStep((balances.Max() - balances.Min()) / 3);
+        _low = Math.Floor(balances.Min() / step) * step;
+        _high = Math.Ceiling(balances.Max() / step) * step;
+        if (_high <= _low) _high = _low + step;
+        _ticks = [];
+        for (double tick = _low; tick <= _high + step / 1000; tick += step) _ticks.Add(tick);
+
+        _line = string.Concat(balances.Select((b, i) => $"{(i == 0 ? "M" : "L")}{F(X(i))} {F(Y(b))}"));
+        _area = $"M{F(X(0))} {F(EquityBottom)}" + string.Concat(balances.Select((b, i) => $"L{F(X(i))} {F(Y(b))}")) + $"L{F(X(_last))} {F(EquityBottom)}Z";
+
+        _hoverPoints = System.Text.Json.JsonSerializer.Serialize(Points.Select((p, i) =>
+        {
+            double result = i == 0 ? 0 : Math.Round(p.Balance - Points[i - 1].Balance, 2);
+            return new HoverPoint(
+                Math.Round(X(i), 2),
+                Math.Round(Y(p.Balance), 2),
+                p.Date is { } date ? date.ToString("ddd, dd MMM yyyy", Inv) : "Start",
+                DashboardFormat.Euro(p.Balance),
+                i == 0 ? null : p.IsReset ? "Curve reset" : DashboardFormat.SignedEuro(result),
+                p.IsReset ? 0 : result);
+        }));
+    }
+
+    /// <summary>A reset near the right end of the chart gets its label on the left of its line, so it isn't cut off.</summary>
+    private bool NearRightEdge(int index) => X(index) > W - Right - 48;
+
+    private double X(int index) => Left + (W - Left - Right) * index / _last;
+    private double Y(double balance) => EquityBottom - (EquityBottom - EquityTop) * (balance - _low) / (_high - _low);
+
+    /// <summary>A round step (1, 2 or 5 times a power of ten) close to the given span.</summary>
+    private static double NiceStep(double span)
+    {
+        if (span <= 0) return 50;
+        double power = Math.Pow(10, Math.Floor(Math.Log10(span)));
+        double m = span / power;
+        return (m <= 1.5 ? 1 : m <= 3 ? 2 : m <= 7 ? 5 : 10) * power;
+    }
+
+    private static string DateLabel(DateOnly? date) => date?.ToString("dd MMM yyyy", Inv) ?? "";
+
+    // SVG coordinates always use a dot, whatever the server's culture.
+    private static string F(double value) => value.ToString("0.##", Inv);
+}

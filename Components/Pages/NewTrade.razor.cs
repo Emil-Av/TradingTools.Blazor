@@ -7,7 +7,10 @@ using MudBlazor;
 using Shared.Enums;
 using SharedEnums.Enums;
 using TradingTools.Blazor.Services;
+using TradingTools.Blazor.Services.AddOns;
 using TradingTools.Blazor.Services.Interfaces;
+using TradingTools.Blazor.Services.Settings;
+using TradingTools.Blazor.Services.Validation;
 
 namespace TradingTools.Blazor.Components.Pages
 {
@@ -16,6 +19,7 @@ namespace TradingTools.Blazor.Components.Pages
         [Inject] private INewTradeService NewTradeService { get; set; } = default!;
         [Inject] private ISnackbar Snackbar { get; set; } = default!;
         [Inject] private IJSRuntime JS { get; set; } = default!;
+        [Inject] private ISettingsService SettingsService { get; set; } = default!;
 
         private const long MaxFileSizeBytes = 10 * 1024 * 1024;
 
@@ -36,15 +40,80 @@ namespace TradingTools.Blazor.Components.Pages
 
         private double? _pnl;
 
+        private readonly List<TradeAddOn> _addOns = [];
+
         private ECandleType _candleType = ECandleType.Bullish;
         private bool _isInOvernightRange;
         private bool _isFlippedSwitch;
 
         private bool _saving;
 
+        // The spread of each instrument (Settings page): taken off every position's result, so the outcome set
+        // from the net result of a trade with add-ons agrees with the Trades page and the dashboard.
+        private SpreadTable _spreads = SpreadTable.None;
+
+        protected override async Task OnInitializedAsync()
+        {
+            _spreads = await SettingsService.GetSpreadsAsync();
+
+            // A new trade starts on the default account (Settings): Demo Trading or Trade. It can still be changed above.
+            _sizeData.SampleSizeType = await SettingsService.GetDefaultAccountAsync();
+        }
+
         // See the matching comment in Trades.razor.cs: clicking the drop zone asks JS to click the
         // hidden <InputFile> directly rather than relying on a <label for="..."> to forward the click.
         private Task TriggerUpload() => JS.InvokeVoidAsync("triggerFileInputClick", "screenshotInput").AsTask();
+
+        // Same rule as the Trades page: P&L = |exit - entry| in points, filled in once both prices are there.
+        private void OnEntryPriceChanged(double? value)
+        {
+            _entryPrice = value;
+            _pnl = TradePnl.Points(_entryPrice, _exitPrice) ?? _pnl;
+            RecalculateOutcome();
+        }
+
+        private void OnExitPriceChanged(double? value)
+        {
+            _exitPrice = value;
+            _pnl = TradePnl.Points(_entryPrice, _exitPrice) ?? _pnl;
+            RecalculateOutcome();
+        }
+
+        // A new add-on starts with the trade's exit price: usually the whole position is closed at once.
+        private void AddAddOn()
+        {
+            _addOns.Add(new TradeAddOn { ExitPrice = _exitPrice });
+            RecalculateOutcome();
+        }
+
+        private void RemoveAddOn(TradeAddOn addOn)
+        {
+            _addOns.Remove(addOn);
+            RecalculateOutcome();
+        }
+
+        private void OnAddOnEntryChanged(TradeAddOn addOn, double? value)
+        {
+            addOn.EntryPrice = value;
+            addOn.PnL = TradePnl.Points(addOn.EntryPrice, addOn.ExitPrice) ?? addOn.PnL;
+            RecalculateOutcome();
+        }
+
+        private void OnAddOnExitChanged(TradeAddOn addOn, double? value)
+        {
+            addOn.ExitPrice = value;
+            addOn.PnL = TradePnl.Points(addOn.EntryPrice, addOn.ExitPrice) ?? addOn.PnL;
+            RecalculateOutcome();
+        }
+
+        /// <summary>The whole trade's result in euro (main position + add-ons); null without add-ons or while something is missing.</summary>
+        private TradeNetResult? Net => _addOns.Count > 0 ? TradeNet.Calculate(_direction, _entryPrice, _exitPrice, _amount, _addOns, _spreads.For(_symbol.ToString())) : null;
+
+        /// <summary>With add-ons the outcome is the net result of the whole trade (it can still be changed by hand).</summary>
+        private void RecalculateOutcome()
+        {
+            if (Net is { } net) _outcome = net.Outcome;
+        }
 
         private void OnFilesSelected(InputFileChangeEventArgs e)
         {
@@ -143,6 +212,8 @@ namespace TradingTools.Blazor.Components.Pages
             MaxPrice = _maxPrice,
             PnL = _pnl,
             Status = EStatus.Closed,
+            // Saved with the trade (EF inserts them along with it and sets their trade id).
+            AddOns = [.. _addOns],
         };
 
         private void ClearForm()
@@ -159,6 +230,7 @@ namespace TradingTools.Blazor.Components.Pages
             _exitPrice = null;
             _maxPrice = null;
             _pnl = null;
+            _addOns.Clear();
             _candleType = ECandleType.Bullish;
             _isInOvernightRange = false;
             _isFlippedSwitch = false;

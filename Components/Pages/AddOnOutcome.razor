@@ -1,0 +1,25 @@
+@using SharedEnums.Enums
+@using Shared.Enums
+@* An add-on's own outcome: read-only, worked out from its entry, exit and the trade's direction (see
+   TradeAddOns.OutcomeOf), never typed in. Win / Loss / Breakeven in the colours used elsewhere; a dash
+   until both prices are filled in. *@
+<MudTextField T="string" Value="@Text" ReadOnly="true" Label="Outcome" Variant="Variant.Outlined"
+              Margin="@(Dense ? Margin.Dense : Margin.None)" Class="@($"app-addon-outcome {ToneClass}")"
+              UserAttributes="@(new Dictionary<string, object> { ["tabindex"] = -1, ["title"] = "Set automatically from the entry price, exit price and the trade's direction" })" />
+
+@code {
+    /// <summary>The add-on's outcome; null while a price is missing.</summary>
+    [Parameter] public EOutcome? Outcome { get; set; }
+
+    /// <summary>The compact field size used on the Trades page.</summary>
+    [Parameter] public bool Dense { get; set; }
+
+    private string Text => Outcome?.ToString() ?? "—";
+
+    private string ToneClass => Outcome switch
+    {
+        EOutcome.Win => "app-addon-outcome-win",
+        EOutcome.Loss => "app-addon-outcome-loss",
+        _ => "app-addon-outcome-flat"
+    };
+}

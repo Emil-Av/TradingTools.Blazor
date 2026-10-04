@@ -1,0 +1,100 @@
+@page "/settings"
+@rendermode InteractiveServer
+@using TradingTools.Blazor.Services.Dashboard
+
+<MudProviders />
+
+<PageTitle>Settings</PageTitle>
+
+<div class="app-content">
+
+    <TopBar Title="Settings" Subtitle="Spreads, account amounts and the equity curve" />
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        <section class="app-card" style="padding:20px 22px;" aria-label="Default account">
+            <div style="font-size:15px; font-weight:700;">Default Account</div>
+            <div class="app-settings-help">
+                The account the whole app works with. The Dashboard, the History, the Data check and the Trades pages show
+                the trades of this account, and a new trade starts on it. <strong>Demo</strong> is the Demo Trading account,
+                <strong>Real</strong> is the Trade account. The change is saved as soon as you click.
+            </div>
+            <div class="app-seg" role="group" aria-label="Default account">
+                <button type="button" aria-pressed="@(_defaultAccount == SampleSizeType.DemoTrading ? "true" : "false")" disabled="@_busy"
+                        @onclick="() => SetDefaultAccountAsync(SampleSizeType.DemoTrading)">Demo</button>
+                <button type="button" aria-pressed="@(_defaultAccount == SampleSizeType.Trade ? "true" : "false")" disabled="@_busy"
+                        @onclick="() => SetDefaultAccountAsync(SampleSizeType.Trade)">Real</button>
+            </div>
+        </section>
+
+        <section class="app-card" style="padding:20px 22px;" aria-label="Spread">
+            <div style="font-size:15px; font-weight:700;">Spread</div>
+            <div class="app-settings-help">
+                The spread of each instrument in points: what opening a position costs. It is taken off the result of every
+                position of a trade in that instrument - the main position and each add-on - and then multiplied by the
+                volume, on the Trades page, the dashboard and the history alike. A breakeven therefore costs the spread too,
+                and a small win can end up below zero. Leave it at 0 for no spread.
+            </div>
+            <div class="app-settings-grid">
+                @foreach (var symbol in Enum.GetValues<ESymbol>())
+                {
+                    var current = symbol;
+                    <MudNumericField T="double?" Value="_spreads[current]" ValueChanged="@(v => _spreads[current] = v)"
+                                     Label="@($"{MyEnumConverter.SymbolFromEnum(current)} spread (points)")" Min="0" Step="0.1" Format="0.##"
+                                     Variant="Variant.Outlined" Margin="Margin.Dense" />
+                }
+            </div>
+        </section>
+
+        <section class="app-card" style="padding:20px 22px;" aria-label="Accounts">
+            <div style="font-size:15px; font-weight:700;">Accounts</div>
+            <div class="app-settings-help">
+                The account amount is where the equity curve of that account starts - it used to be a fixed €2,000.
+                Changing it moves the start of the current curve. <strong>Reset equity curve</strong> starts a new curve
+                at the amount in the field, counting from the next trade you log. Nothing is deleted: your trades stay as
+                they are, and <em>All history</em> on the dashboard still shows every curve, with each reset marked.
+            </div>
+
+            @foreach (var account in DashboardSelection.Accounts)
+            {
+                var current = account;
+                var settings = _accounts[current];
+                <div class="app-settings-account">
+                    <div class="app-settings-account-name">@MyEnumConverter.TradeTypeFromEnum(current)</div>
+                    @* The width sits on a wrapper: the field itself ignores a width and would stretch across the row. *@
+                    <div style="width:240px; flex:0 0 auto;">
+                        <MudNumericField T="double?" Value="_amounts[current]" ValueChanged="@(v => _amounts[current] = v)"
+                                         Label="Account amount (€)" Min="0" Step="100" Format="0.##"
+                                         Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    </div>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Warning" StartIcon="@Icons.Material.Filled.RestartAlt"
+                               Disabled="_busy" OnClick="@(() => ResetAsync(current))">
+                        Reset equity curve
+                    </MudButton>
+                    <div class="app-settings-note">
+                        @if (settings.Resets.Count == 0)
+                        {
+                            <span>The curve has never been reset.</span>
+                        }
+                        else
+                        {
+                            <span>
+                                @settings.Resets.Count reset@(settings.Resets.Count == 1 ? "" : "s"):
+                                @string.Join(" · ", settings.Resets.Select(r => $"{DashboardFormat.ShortDate(DateOnly.FromDateTime(r.ResetAtUtc))} to {DashboardFormat.Euro(r.StartingBalance)}"))
+                            </span>
+                        }
+                    </div>
+                </div>
+            }
+        </section>
+
+        <div>
+            <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Save" Disabled="_busy" OnClick="SaveAsync">Save settings</MudButton>
+        </div>
+    }
+
+</div>

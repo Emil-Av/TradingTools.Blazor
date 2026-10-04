@@ -1,19 +1,16 @@
 @page "/new-trade"
 @rendermode InteractiveServer
+@using TradingTools.Blazor.Services.AddOns
+@using TradingTools.Blazor.Services.Dashboard
 
 <MudProviders />
 
 <PageTitle>New Trade</PageTitle>
 
-<TopBar Title="New Trade" ShowNewTradeButton="false" />
-
 <div class="app-content" style="align-items:center;">
     <div style="width:100%; max-width:920px; display:flex; flex-direction:column; gap:20px;">
 
-        <div>
-            <MudText Typo="Typo.h5" Style="font-weight:800;">Log a New Trade</MudText>
-            <MudText Typo="Typo.body2" Style="color:var(--app-text-secondary); margin-top:4px;">Capture the setup while it&#8217;s fresh &mdash; you can fill in the journal later.</MudText>
-        </div>
+        <TopBar Title="Log a new trade" Subtitle="Capture the setup while it’s fresh. You can fill in the journal later." />
 
         <div class="app-card" style="padding:24px;">
             <MudText Typo="Typo.subtitle1" Style="font-weight:700; margin-bottom:16px;">Sample</MudText>
@@ -74,7 +71,7 @@
                 <MudTabPanel Text="Basic Info">
                     <MudGrid Spacing="3">
                         <MudItem xs="12" sm="6" md="4">
-                            <MudDatePicker Label="Date" @bind-Date="_dateAsDateTime" Variant="Variant.Outlined" />
+                            <MudDatePicker Culture="AppCulture.DatePicker" Label="Date" @bind-Date="_dateAsDateTime" Variant="Variant.Outlined" />
                         </MudItem>
                         <MudItem xs="12" sm="6" md="4">
                             <MudSelect T="ESymbol" @bind-Value="_symbol" Label="Symbol" Variant="Variant.Outlined">
@@ -85,13 +82,13 @@
                             </MudSelect>
                         </MudItem>
                         <MudItem xs="12" sm="6" md="4">
-                            <MudSelect T="EDirection" @bind-Value="_direction" Label="Direction" Variant="Variant.Outlined">
+                            <MudSelect T="EDirection" @bind-Value="_direction" @bind-Value:after="RecalculateOutcome" Label="Direction" Variant="Variant.Outlined">
                                 <MudSelectItem Value="EDirection.Long">Long</MudSelectItem>
                                 <MudSelectItem Value="EDirection.Short">Short</MudSelectItem>
                             </MudSelect>
                         </MudItem>
                         <MudItem xs="12" sm="6" md="4">
-                            <MudNumericField T="double?" @bind-Value="_amount" Label="Amount" Variant="Variant.Outlined" />
+                            <MudNumericField T="double?" @bind-Value="_amount" @bind-Value:after="RecalculateOutcome" Label="Amount" Variant="Variant.Outlined" />
                         </MudItem>
                         <MudItem xs="12" sm="6" md="4">
                             <MudSelect T="EOutcome" @bind-Value="_outcome" Label="Outcome" Variant="Variant.Outlined">
@@ -115,13 +112,13 @@
                 <MudTabPanel Text="Prices">
                     <MudGrid Spacing="3">
                         <MudItem xs="12" sm="6" md="3">
-                            <MudNumericField T="double?" @bind-Value="_entryPrice" Label="Entry Price" Variant="Variant.Outlined" Format="F2" />
+                            <MudNumericField T="double?" Value="_entryPrice" ValueChanged="OnEntryPriceChanged" Immediate="true" Label="Entry Price" Variant="Variant.Outlined" Format="F2" />
                         </MudItem>
                         <MudItem xs="12" sm="6" md="3">
                             <MudNumericField T="double?" @bind-Value="_stopPrice" Label="Stop Price" Variant="Variant.Outlined" Format="F2" />
                         </MudItem>
                         <MudItem xs="12" sm="6" md="3">
-                            <MudNumericField T="double?" @bind-Value="_exitPrice" Label="Exit Price" Variant="Variant.Outlined" Format="F2" />
+                            <MudNumericField T="double?" Value="_exitPrice" ValueChanged="OnExitPriceChanged" Immediate="true" Label="Exit Price" Variant="Variant.Outlined" Format="F2" />
                         </MudItem>
                         <MudItem xs="12" sm="6" md="3">
                             <MudNumericField T="double?" @bind-Value="_maxPrice" Label="Max Price" Variant="Variant.Outlined" Format="F2" />
@@ -132,9 +129,52 @@
                 <MudTabPanel Text="Results">
                     <MudGrid Spacing="3">
                         <MudItem xs="12" sm="6" md="4">
-                            <MudNumericField T="double?" @bind-Value="_pnl" Label="P&amp;L" Variant="Variant.Outlined" Format="F2" />
+                            <MudNumericField T="double?" @bind-Value="_pnl" Label="P&amp;L (points)" HelperText="Filled in from |exit − entry|" Variant="Variant.Outlined" Format="F2" />
                         </MudItem>
                     </MudGrid>
+                </MudTabPanel>
+
+                <MudTabPanel Text="@(_addOns.Count == 0 ? "Add-ons" : $"Add-ons ({_addOns.Count})")">
+                    <div style="display:flex; align-items:center; justify-content:space-between;" class="mb-3">
+                        <MudText Typo="Typo.body2" Style="color:var(--app-text-secondary);">Each time you added to the position while the trade was open. The max price only applies to the original trade.</MudText>
+                        <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AddAddOn" Style="flex:0 0 auto;">Add add-on</MudButton>
+                    </div>
+                    @if (_addOns.Count == 0)
+                    {
+                        <MudText Typo="Typo.caption" Style="color:var(--app-text-secondary);">No add-ons.</MudText>
+                    }
+                    @for (int i = 0; i < _addOns.Count; i++)
+                    {
+                        int index = i;
+                        var addOn = _addOns[index];
+                        <div class="app-addon-row" @key="addOn">
+                            <div class="app-addon-number">#@(index + 1)</div>
+                            <MudNumericField T="double?" Value="addOn.EntryPrice" ValueChanged="@(v => OnAddOnEntryChanged(addOn, v))" Immediate="true" Label="Entry Price" Variant="Variant.Outlined" Format="F2" />
+                            <MudNumericField T="double?" Value="addOn.ExitPrice" ValueChanged="@(v => OnAddOnExitChanged(addOn, v))" Immediate="true" Label="Exit Price" Variant="Variant.Outlined" Format="F2" />
+                            <MudNumericField T="double?" @bind-Value="addOn.Volume" @bind-Value:after="RecalculateOutcome" Label="Volume" Variant="Variant.Outlined" />
+                            <MudNumericField T="double?" @bind-Value="addOn.PnL" Label="P&amp;L (points)" HelperText="Filled in from |exit − entry|" Variant="Variant.Outlined" Format="F2" />
+                            <AddOnOutcome Outcome="@TradeAddOns.OutcomeOf(addOn, _direction)" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" aria-label="Remove add-on" Style="margin-top:10px;" OnClick="@(() => RemoveAddOn(addOn))" />
+                        </div>
+                    }
+                    @if (_addOns.Count > 0)
+                    {
+                        @* One trade, one result: the Outcome (Basic Info tab) follows the net of the main position and every add-on. *@
+                        <div class="app-addon-net">
+                            @if (Net is { } net)
+                            {
+                                <span>Net result after spread</span>
+                                <span class="app-mono @DashboardFormat.ToneClass(net.NetEuro)">@DashboardFormat.SignedEuro(net.NetEuro)</span>
+                                <span>&rarr; <strong>@net.Outcome</strong></span>
+                                <span class="app-addon-net-parts">main <span class="app-mono">@DashboardFormat.SignedEuro(net.MainEuro)</span> · add-ons <span class="app-mono">@DashboardFormat.SignedEuro(net.AddOnsEuro)</span></span>
+                            }
+                            else
+                            {
+                                <span>Net result of the whole trade: fill in the amount, direction and every price and volume to see it.</span>
+                            }
+                        </div>
+                        <MudText Typo="Typo.caption" Style="color:var(--app-text-secondary);">The outcome is set from the net result.</MudText>
+                    }
                 </MudTabPanel>
 
                 <MudTabPanel Text="Strategy">

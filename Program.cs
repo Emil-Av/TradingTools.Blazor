@@ -2,6 +2,8 @@ using System.Globalization;
 using DataAccess.Data;
 using DataAccess.Repository;
 using DataAccess.Repository.IRepository;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Models;
@@ -12,6 +14,9 @@ using Statistics.Services;
 using TradingTools.Blazor.Components;
 using TradingTools.Blazor.Services;
 using TradingTools.Blazor.Services.Interfaces;
+using TradingTools.Blazor.Services.DataBackup;
+using TradingTools.Blazor.Services.Screenshots;
+using TradingTools.Blazor.Services.Validation;
 using Utilities.Trade;
 
 // Library UI text (e.g. the rich text editor toolbar) follows the UI culture, which otherwise comes from
@@ -32,7 +37,10 @@ builder.Services.Configure<Microsoft.AspNetCore.SignalR.HubOptions>(options =>
     options.MaximumReceiveMessageSize = 15 * 1024 * 1024;
 });
 
-builder.Services.AddMudServices();
+// Dropdowns (MudSelect, MudMenu, the date pickers) close when the user clicks anywhere outside them.
+// The default "modeless" mode leaves the page clickable and relies on a JS pointer listener to detect
+// the outside click, which didn't reliably close them; a modal overlay catches that click itself.
+builder.Services.AddMudServices(config => config.PopoverOptions.ModalOverlay = true);
 builder.Services.AddRadzenComponents();
 
 // Mirrors the Razor Pages app's authentication: cookie-based Identity. The login wall itself is
@@ -42,6 +50,18 @@ builder.Services.AddRadzenComponents();
 // page and can't be exempted individually, breaking the app for anonymous visitors.
 builder.Services.AddCascadingAuthenticationState();
 
+// Sign-in cookies are encrypted with Data Protection keys that are scoped to the app's name, which by
+// default is its folder. On the VPS every deploy is a new release folder (see deploy.ps1), so without a
+// fixed name each deploy would sign everyone out.
+builder.Services.AddDataProtection().SetApplicationName("TradingTools.Blazor");
+
+// On the VPS the app sits behind nginx, which terminates HTTPS and passes the original scheme and client
+// address in X-Forwarded-* headers. nginx runs on the same machine, which the defaults already trust.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+});
+
 ConfigureDatabase(builder);
 ConfigureIdentity(builder);
 AddServices(builder);
@@ -50,6 +70,10 @@ var app = builder.Build();
 
 ApplyMigrations(app);
 ApplySymbolDataFix(app);
+MigrateLegacyScreenshots(app);
+
+// First, so everything after it (HTTPS redirection, cookies, antiforgery) sees https behind nginx.
+app.UseForwardedHeaders();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
@@ -73,6 +97,8 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+app.MapBackupEndpoints();
 
 // Plain GET+POST endpoints (not a Razor component) so the topbar's account menu can log out with a
 // real <form> post, exactly like the Razor Pages app's /Account/Logout page did.
@@ -155,6 +181,23 @@ static void ApplySymbolDataFix(WebApplication app)
     }
 }
 
+// Merges the old wwwroot/ScreenshotsDev folder into wwwroot/Screenshots and rewrites the database
+// paths to match (see LegacyScreenshotMigration). A no-op once done. A failure is logged rather than
+// stopping the app - screenshots stay where they were until the next start.
+static void MigrateLegacyScreenshots(WebApplication app)
+{
+    using var scope = app.Services.CreateScope();
+    try
+    {
+        scope.ServiceProvider.GetRequiredService<LegacyScreenshotMigration>().RunAsync().GetAwaiter().GetResult();
+    }
+    catch (Exception ex)
+    {
+        scope.ServiceProvider.GetRequiredService<ILogger<Program>>()
+            .LogError(ex, "Moving screenshots from ScreenshotsDev to Screenshots failed.");
+    }
+}
+
 static void ConfigureIdentity(WebApplicationBuilder builder)
 {
     builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
@@ -196,6 +239,20 @@ static void AddServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IStatisticsService, StatisticsService>();
     builder.Services.AddScoped<INewTradeService, NewTradeService>();
     builder.Services.AddScoped<ITradesService, TradesService>();
+    builder.Services.AddScoped<TradingTools.Blazor.Services.Settings.ISettingsService, TradingTools.Blazor.Services.Settings.SettingsService>();
+    builder.Services.AddScoped<TradingTools.Blazor.Services.AddOns.ITradeAddOnStore, TradingTools.Blazor.Services.AddOns.TradeAddOnStore>();
+    builder.Services.AddScoped<IDashboardService, TradingTools.Blazor.Services.Dashboard.DashboardService>();
+
+    // Trade validation: the monitor (latest report + run requests) is shared app-wide, the worker
+    // does the checking in the background, the service itself is scoped like the repositories.
+    builder.Services.AddSingleton(TimeProvider.System);
+    builder.Services.AddSingleton<TradeValidationMonitor>();
+    builder.Services.AddSingleton<ITradeValidationMonitor>(sp => sp.GetRequiredService<TradeValidationMonitor>());
+    builder.Services.AddScoped<ITradeValidationService, TradeValidationService>();
+    builder.Services.AddHostedService<TradeValidationWorker>();
+
+    builder.Services.AddScoped<LegacyScreenshotMigration>();
+    builder.Services.AddSingleton<IDatabaseBackup, PostgresDatabaseBackup>();
 
     // Journal/Review text is stored as HTML from the rich text editor - sanitized before saving.
     builder.Services.AddSingleton<Ganss.Xss.IHtmlSanitizer, Ganss.Xss.HtmlSanitizer>();

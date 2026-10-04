@@ -1,0 +1,21 @@
+# /etc/systemd/system/tradingtools-blazor.service - installed once (docs/DEPLOYMENT.md).
+# Runs whatever release /var/www/tradingtools-blazor/current points to; deploy.ps1 switches it.
+[Unit]
+Description=TradingTools Blazor app
+After=network.target postgresql.service
+
+[Service]
+WorkingDirectory=/var/www/tradingtools-blazor/current
+ExecStart=/usr/bin/dotnet /var/www/tradingtools-blazor/current/TradingTools.Blazor.dll --contentRoot /var/www/tradingtools-blazor/current
+Restart=always
+RestartSec=10
+KillSignal=SIGINT
+SyslogIdentifier=tradingtools-blazor
+# Same user as the old Razor app, which owns the screenshots and runs pg_dump for the Backup page.
+User=root
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://localhost:5001
+Environment=DOTNET_NOLOGO=1
+
+[Install]
+WantedBy=multi-user.target

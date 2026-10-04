@@ -1,0 +1,31 @@
+@using TradingTools.Blazor.Services.Dashboard
+@* One "By ..." group on the dashboard: per row the trade count and win rate, net euro as a diverging
+   bar (gains right of the centre line, losses left, scaled to the largest row) and the amount. *@
+
+<div>
+    <div class="app-label" style="margin-bottom:6px;">@Title</div>
+    @if (Rows.Count == 0)
+    {
+        <div class="app-flat" style="font-size:13px;">No trades.</div>
+    }
+    else
+    {
+        double max = Math.Max(Rows.Max(r => Math.Abs(r.NetEuro)), 0.01);
+        @foreach (var row in Rows)
+        {
+            <div class="app-breakdown-row">
+                <div class="app-breakdown-name">
+                    @row.Name
+                    <small>@row.Trades @(row.Trades == 1 ? "trade" : "trades") · @(row.Wins)W / @(row.Losses)L · @DashboardFormat.Percent(row.WinRate) won</small>
+                </div>
+                <DivergingBar Value="row.NetEuro" Max="max" />
+                <div class="app-breakdown-value app-mono @DashboardFormat.ToneClass(row.NetEuro)">@DashboardFormat.SignedEuro(row.NetEuro)</div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public List<DashboardStats.Breakdown> Rows { get; set; } = [];
+}

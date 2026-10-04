@@ -7,6 +7,8 @@ using Models.ViewModels.DisplayClasses;
 using SharedEnums.Enums;
 using System.Diagnostics;
 using TradingTools.Blazor.Services.Interfaces;
+using TradingTools.Blazor.Services.Screenshots;
+using TradingTools.Blazor.Services.Validation;
 using Utilities;
 
 namespace TradingTools.Blazor.Services
@@ -15,13 +17,15 @@ namespace TradingTools.Blazor.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IWebHostEnvironment _webHostEnvironment;
+        private readonly ITradeValidationMonitor _validationMonitor;
         private NewTradeVM _viewModel = null!;
         private IFormFile[] _files = null!;
 
-        public NewTradeService(IUnitOfWork unitOfWork, IWebHostEnvironment webHostEnvironment)
+        public NewTradeService(IUnitOfWork unitOfWork, IWebHostEnvironment webHostEnvironment, ITradeValidationMonitor validationMonitor)
         {
             _unitOfWork = unitOfWork;
             _webHostEnvironment = webHostEnvironment;
+            _validationMonitor = validationMonitor;
         }
 
         public async Task SaveTradeAsync(NewTradeVM viewModel, IFormFile[] files)
@@ -36,6 +40,7 @@ namespace TradingTools.Blazor.Services
             else
             {
                 await SaveTradeAsync();
+                _validationMonitor.RequestValidation();
             }
         }
 
@@ -80,7 +85,7 @@ namespace TradingTools.Blazor.Services
                 var (sampleSizeId, isFull) = await ProcessSampleSize(maxTradesProSampleSize: 20, _viewModel.EspressoTrade.IsFlippedTheSwitch);
                 _viewModel.EspressoTrade.SampleSizeId = sampleSizeId;
                 _viewModel.EspressoTrade.JournalId = await CreateJournal();
-                _viewModel.EspressoTrade.ScreenshotsUrls = await ScreenshotsService.SaveFilesAsync(_webHostEnvironment.WebRootPath, _viewModel, _viewModel.EspressoTrade, _files, isFull);
+                _viewModel.EspressoTrade.ScreenshotsUrls = await ScreenshotStorage.SaveFilesAsync(_webHostEnvironment.WebRootPath, _viewModel, _viewModel.EspressoTrade, _files, isFull);
 
                 _unitOfWork.Espresso.Add(_viewModel.EspressoTrade);
                 await _unitOfWork.SaveAsync();
@@ -98,7 +103,7 @@ namespace TradingTools.Blazor.Services
                 var (sampleSizeId, isFull) = await ProcessSampleSize(maxTradesProSampleSize: 20, _viewModel.BrunchBreakTrade.IsFlippedTheSwitch);
                 _viewModel.BrunchBreakTrade.SampleSizeId = sampleSizeId;
                 _viewModel.BrunchBreakTrade.JournalId = await CreateJournal();
-                _viewModel.BrunchBreakTrade.ScreenshotsUrls = await ScreenshotsService.SaveFilesAsync(_webHostEnvironment.WebRootPath, _viewModel, _viewModel.BrunchBreakTrade, _files, isFull);
+                _viewModel.BrunchBreakTrade.ScreenshotsUrls = await ScreenshotStorage.SaveFilesAsync(_webHostEnvironment.WebRootPath, _viewModel, _viewModel.BrunchBreakTrade, _files, isFull);
 
                 _unitOfWork.BrunchBreak.Add(_viewModel.BrunchBreakTrade);
                 await _unitOfWork.SaveAsync();
@@ -116,7 +121,7 @@ namespace TradingTools.Blazor.Services
                 var (sampleSizeId, isFull) = await ProcessSampleSize(maxTradesProSampleSize: 20, _viewModel.SRSTrade.IsFlippedTheSwitch);
                 _viewModel.SRSTrade.SampleSizeId = sampleSizeId;
                 _viewModel.SRSTrade.JournalId = await CreateJournal();
-                _viewModel.SRSTrade.ScreenshotsUrls = await ScreenshotsService.SaveFilesAsync(_webHostEnvironment.WebRootPath, _viewModel, _viewModel.SRSTrade, _files, isFull);
+                _viewModel.SRSTrade.ScreenshotsUrls = await ScreenshotStorage.SaveFilesAsync(_webHostEnvironment.WebRootPath, _viewModel, _viewModel.SRSTrade, _files, isFull);
 
                 _unitOfWork.SRS.Add(_viewModel.SRSTrade);
                 await _unitOfWork.SaveAsync();
@@ -146,7 +151,7 @@ namespace TradingTools.Blazor.Services
             var researchData = new ResearchCandleBracketing();
             EntityMapper.ViewModelToEntity(researchData, viewData);
             researchData.SampleSizeId = sampleSizeData.id;
-            researchData.ScreenshotsUrls = await ScreenshotsService.SaveFilesAsync(_webHostEnvironment.WebRootPath, _viewModel, viewData, _files, sampleSizeData.isFull);
+            researchData.ScreenshotsUrls = await ScreenshotStorage.SaveFilesAsync(_webHostEnvironment.WebRootPath, _viewModel, viewData, _files, sampleSizeData.isFull);
 
             _unitOfWork.ResearchCandleBracketing.Add(researchData);
             try
@@ -168,7 +173,7 @@ namespace TradingTools.Blazor.Services
             var researchData = new ResearchCradle();
             EntityMapper.ViewModelToEntity(researchData, viewData);
             researchData.SampleSizeId = sampleSizeData.id;
-            researchData.ScreenshotsUrls = await ScreenshotsService.SaveFilesAsync(_webHostEnvironment.WebRootPath, _viewModel, viewData, _files, sampleSizeData.isFull);
+            researchData.ScreenshotsUrls = await ScreenshotStorage.SaveFilesAsync(_webHostEnvironment.WebRootPath, _viewModel, viewData, _files, sampleSizeData.isFull);
 
             _unitOfWork.ResearchCradle.Add(researchData);
             await _unitOfWork.SaveAsync();
@@ -184,7 +189,7 @@ namespace TradingTools.Blazor.Services
             var sampleSizeData = await ProcessSampleSize(maxTradesProSampleSize);
             researchData.SampleSizeId = sampleSizeData.id;
 
-            researchData.ScreenshotsUrls = await ScreenshotsService.SaveFilesAsync(_webHostEnvironment.WebRootPath, _viewModel, researchData, _files, sampleSizeData.isFull);
+            researchData.ScreenshotsUrls = await ScreenshotStorage.SaveFilesAsync(_webHostEnvironment.WebRootPath, _viewModel, researchData, _files, sampleSizeData.isFull);
 
             _unitOfWork.ResearchFirstBarPullback.Add(researchData);
             await _unitOfWork.SaveAsync();
