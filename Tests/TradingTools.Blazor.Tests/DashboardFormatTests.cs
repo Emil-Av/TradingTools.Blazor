@@ -27,6 +27,17 @@ namespace TradingTools.Blazor.Tests
         }
 
         [Theory]
+        [InlineData(12.5, "app-gain")]
+        [InlineData(-0.01, "app-loss")]
+        [InlineData(0, "app-flat")]
+        [InlineData(-0.004, "app-flat")] // shown as "€0.00", so it must not be colored as a loss
+        [InlineData(0.004, "app-flat")]
+        public void Tone_follows_the_amount_as_displayed(double value, string expected)
+        {
+            DashboardFormat.ToneClass(value).Should().Be(expected);
+        }
+
+        [Theory]
         [InlineData(2827.75, "€2,827.75")]
         [InlineData(2000, "€2,000.00")]
         public void Unsigned_euro(double value, string expected)

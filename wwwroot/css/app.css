@@ -1,12 +1,14 @@
-/* Layout and component styles for the trading journal.
-   Colors always come from the CSS variables emitted by Components/Layout/ThemeStyles.razor
-   (which in turn come from Theme/AppTheme.cs) — never hard-code a color here. */
+/* Layout and component styles for the trading journal ("mirror ledger" design).
+   Colors and font stacks always come from the CSS variables emitted by
+   Components/Layout/ThemeStyles.razor (which in turn come from Theme/AppTheme.cs) — never hard-code
+   a color here. Gains use --app-accent, losses --app-error. */
 
 html, body {
     margin: 0;
     background: var(--app-bg);
     color: var(--app-text-primary);
-    font-family: 'Manrope', system-ui, -apple-system, sans-serif;
+    font-family: var(--app-font-ui);
+    -webkit-font-smoothing: antialiased;
 }
 
 * {
@@ -21,64 +23,77 @@ a:hover {
     color: var(--app-accent-lighten);
 }
 
+:focus-visible {
+    outline: 2px solid var(--app-accent);
+    outline-offset: 2px;
+}
+
 .app-shell {
     display: flex;
+    flex-direction: column;
     min-height: 100vh;
     background: var(--app-bg);
 }
 
-/* ---------- Sidebar ---------- */
+/* ---------- Header: brand, nav, New trade, account ---------- */
 
-.app-sidebar {
-    width: 240px;
-    flex-shrink: 0;
-    background: var(--app-surface);
-    border-right: 1px solid var(--app-border);
+.app-header {
+    position: sticky;
+    top: 0;
+    z-index: 30;
     display: flex;
-    flex-direction: column;
-    padding: 22px 14px;
+    align-items: center;
+    gap: 20px;
+    padding: 12px 28px;
+    background: var(--app-bg);
+    border-bottom: 1px solid var(--app-border);
 }
 
 .app-brand {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 6px 10px 26px 10px;
+    color: var(--app-text-primary);
+    white-space: nowrap;
 }
+.app-brand:hover {
+    color: var(--app-text-primary);
+}
+.app-brand-name {
+    font-weight: 700;
+    font-size: 15px;
+}
+/* Login page brand mark */
 .app-brand-icon {
     width: 32px;
     height: 32px;
-    border-radius: 9px;
-    background: color-mix(in srgb, var(--app-accent) 16%, transparent);
+    border-radius: 8px;
+    background: var(--app-surface-variant);
     display: flex;
     align-items: center;
     justify-content: center;
     color: var(--app-accent);
 }
-.app-brand-name {
-    font-weight: 800;
-    font-size: 15px;
-    letter-spacing: -0.01em;
-}
 
-.app-nav-heading {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: .08em;
-    color: var(--app-text-secondary);
-    padding: 8px 14px 6px;
+.app-nav {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
 }
-
 .app-nav-item {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 10px 14px;
-    border-radius: 10px;
+    gap: 6px;
+    padding: 7px 11px;
+    border-radius: 6px;
     color: var(--app-text-secondary);
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
+    font-size: 13.5px;
+    font-weight: 500;
+    white-space: nowrap;
 }
 .app-nav-item:hover {
     background: var(--app-surface-variant);
@@ -86,18 +101,23 @@ a:hover {
 }
 .app-nav-item.active,
 .app-nav-item.active:hover {
-    background: color-mix(in srgb, var(--app-accent) 16%, transparent);
-    color: var(--app-accent);
+    background: var(--app-surface);
+    color: var(--app-text-primary);
+    box-shadow: inset 0 0 0 1px var(--app-border);
 }
-.app-nav-item svg {
-    flex-shrink: 0;
+.app-nav-sep {
+    flex: 0 0 1px;
+    align-self: stretch;
+    background: var(--app-border);
+    margin: 6px 8px;
 }
 
-.app-sidebar-footer {
-    margin-top: auto;
-    padding: 14px 10px 4px;
-    border-top: 1px solid var(--app-border);
+.app-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
+
 .app-avatar {
     width: 32px;
     height: 32px;
@@ -111,48 +131,97 @@ a:hover {
     color: var(--app-text-secondary);
 }
 
-/* ---------- Main column / topbar ---------- */
+@media (max-width: 960px) {
+    .app-header {
+        flex-wrap: wrap;
+        padding: 10px 16px;
+    }
+    .app-nav {
+        order: 3;
+        flex-basis: 100%;
+    }
+    .app-header-actions {
+        margin-left: auto;
+    }
+}
+
+/* ---------- Main column / page heading ---------- */
 
 .app-main {
     flex: 1;
     display: flex;
     flex-direction: column;
     min-width: 0;
+    width: 100%;
+    max-width: 1360px;
+    margin-inline: auto;
+    padding-inline: 28px;
+}
+@media (max-width: 960px) {
+    .app-main {
+        padding-inline: 16px;
+    }
 }
 
-.app-topbar {
-    height: 64px;
-    flex-shrink: 0;
-    border-bottom: 1px solid var(--app-border);
+.app-page-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding-top: 10px;
+}
+.app-page-title {
+    font-family: var(--app-font-display);
+    font-style: italic;
+    font-weight: 700;
+    font-size: clamp(34px, 4.5vw, 50px);
+    line-height: 1;
+    letter-spacing: -.01em;
+    margin: 0;
+    text-wrap: balance;
+}
+.app-page-sub {
+    margin-top: 10px;
+    max-width: 78ch;
+    font-size: 13.5px;
+    color: var(--app-text-secondary);
+}
+.app-page-actions {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 0 28px;
-}
-.app-topbar-title {
-    font-size: 15px;
-    font-weight: 800;
+    gap: 12px;
+    flex-wrap: wrap;
 }
 
 .app-btn-primary {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    background: var(--app-accent);
-    color: var(--app-accent-contrast);
-    font-weight: 700;
-    font-size: 13px;
-    padding: 9px 18px 9px 14px;
-    border-radius: 999px;
+    background: var(--app-spine);
+    color: var(--app-spine-text);
+    font-family: var(--app-font-ui);
+    font-weight: 600;
+    font-size: 13.5px;
+    padding: 9px 16px;
+    border-radius: 6px;
     border: none;
     cursor: pointer;
+    white-space: nowrap;
 }
 .app-btn-primary:hover {
-    background: var(--app-accent-lighten);
+    color: var(--app-spine-text);
+    background: color-mix(in srgb, var(--app-spine) 88%, var(--app-bg));
+}
+/* On the New trade page itself the header button reads as "you are here". */
+.app-btn-primary.active {
+    background: transparent;
+    color: var(--app-text-primary);
+    box-shadow: inset 0 0 0 1px var(--app-text-primary);
 }
 
 .app-content {
-    padding: 28px;
+    padding-block: 30px 40px;
     display: flex;
     flex-direction: column;
     gap: 20px;
@@ -162,24 +231,22 @@ a:hover {
 
 .app-card {
     background-color: var(--app-surface);
-    background-image: radial-gradient(120% 120% at 100% 0%, color-mix(in srgb, var(--app-accent) 10%, transparent), transparent 60%);
-    border: 1px solid var(--app-border-accent);
-    border-radius: 16px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.55), 0 14px 30px -14px rgba(0,0,0,0.8);
+    border: 1px solid var(--app-border);
+    border-radius: 10px;
 }
 
 .app-chip {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 5px 12px;
+    padding: 3px 9px;
     border-radius: 999px;
-    font-size: 12px;
-    font-weight: 700;
+    font-size: 11.5px;
+    font-weight: 600;
 }
 .app-chip-green { background: color-mix(in srgb, var(--app-accent) 16%, transparent); color: var(--app-accent); }
-.app-chip-red { background: color-mix(in srgb, var(--app-error) 16%, transparent); color: var(--app-error); }
-.app-chip-neutral { background: var(--app-surface-highlight); color: var(--app-text-secondary); }
+.app-chip-red { background: color-mix(in srgb, var(--app-error) 17%, transparent); color: var(--app-error); }
+.app-chip-neutral { background: var(--app-surface-variant); color: var(--app-text-secondary); }
 
 .app-filter-chip {
     display: inline-flex;
@@ -187,7 +254,7 @@ a:hover {
     gap: 8px;
     background: var(--app-surface-variant);
     border: 1px solid var(--app-border);
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 9px 12px;
     font-size: 12.5px;
     font-weight: 600;
@@ -198,15 +265,29 @@ a:hover {
 .app-field label {
     display: block;
     font-size: 11px;
-    font-weight: 700;
+    font-weight: 600;
     color: var(--app-text-secondary);
-    letter-spacing: .03em;
+    letter-spacing: .08em;
+    text-transform: uppercase;
     margin-bottom: 7px;
 }
 
 .app-mono {
-    font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+    font-family: var(--app-font-numbers);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.01em;
 }
+
+.app-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--app-text-secondary);
+}
+.app-gain { color: var(--app-accent); }
+.app-loss { color: var(--app-error); }
+.app-flat { color: var(--app-text-secondary); }
 
 .app-nav-counter {
     display: flex;
@@ -234,7 +315,7 @@ a:hover {
 }
 .app-nav-counter .app-nav-counter-value {
     padding: 9px 14px;
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-family: var(--app-font-numbers);
     font-size: 13px;
     font-weight: 600;
     border-left: 1px solid var(--app-border);
@@ -248,7 +329,7 @@ a:hover {
     width: 34px;
     height: 34px;
     border-radius: 999px;
-    background: rgba(10, 15, 13, 0.7);
+    background: color-mix(in srgb, var(--app-bg) 70%, transparent);
     border: none;
     color: var(--app-text-primary);
     display: flex;
@@ -257,12 +338,12 @@ a:hover {
     cursor: pointer;
 }
 .app-carousel-btn:hover {
-    background: rgba(10, 15, 13, 0.9);
+    background: color-mix(in srgb, var(--app-bg) 90%, transparent);
 }
 
-/* MudBlazor overrides so its components sit on the same dark, near-black world */
+/* MudBlazor overrides so its components use the app fonts */
 .mud-typography {
-    font-family: 'Manrope', system-ui, -apple-system, sans-serif;
+    font-family: var(--app-font-ui);
 }
 
 /* ---------- Framework defaults ---------- */
@@ -324,10 +405,8 @@ h1:focus {
     width: 100%;
     max-width: 380px;
     background-color: var(--app-surface);
-    background-image: radial-gradient(120% 120% at 100% 0%, color-mix(in srgb, var(--app-accent) 10%, transparent), transparent 60%);
-    border: 1px solid var(--app-border-accent);
-    border-radius: 16px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.55), 0 14px 30px -14px rgba(0,0,0,0.8);
+    border: 1px solid var(--app-border);
+    border-radius: 10px;
     padding: 32px 28px;
 }
 
@@ -479,24 +558,287 @@ h1:focus {
 
 /* ---------- Dashboard ---------- */
 
-/* Five KPI tiles: as many per row as fit, never narrower than 190px. */
-.app-kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-    gap: 16px;
+/* Strategy and account switches: segmented controls in the page heading. */
+.app-seg-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: flex-end;
 }
+.app-seg {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 8px;
+    background: var(--app-surface-variant);
+}
+.app-seg button {
+    border: 0;
+    background: transparent;
+    padding: 7px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font: 600 13px var(--app-font-ui);
+    color: var(--app-text-secondary);
+}
+.app-seg button:hover {
+    color: var(--app-text-primary);
+}
+.app-seg button[aria-pressed="true"] {
+    background: var(--app-surface);
+    color: var(--app-text-primary);
+    box-shadow: 0 1px 2px rgba(0,0,0,.3);
+}
+
+/* Mirror ledger: gain figures on the left, loss figures mirrored on the right, win rate in the centre. */
+.app-ledger {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: stretch;
+}
+.app-ledger-side {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+}
+.app-ledger-cell {
+    padding: 16px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.app-ledger-side.left .app-ledger-cell {
+    align-items: flex-end;
+    text-align: right;
+    border-right: 1px solid var(--app-border);
+}
+.app-ledger-side.left .app-ledger-cell:last-child { border-right: 0; }
+.app-ledger-side.right .app-ledger-cell { border-left: 1px solid var(--app-border); }
+.app-ledger-side.right .app-ledger-cell:first-child { border-left: 0; }
+.app-ledger-value {
+    font-family: var(--app-font-numbers);
+    font-variant-numeric: tabular-nums;
+    font-size: 24px;
+    font-weight: 500;
+    letter-spacing: -.01em;
+}
+.app-ledger-sub {
+    font-size: 12px;
+    color: var(--app-text-secondary);
+}
+/* Win rate: the centre cell, between the gain and the loss sides. */
+.app-ledger-center {
+    min-width: 190px;
+    align-items: center;
+    text-align: center;
+    border-left: 1px solid var(--app-border);
+    border-right: 1px solid var(--app-border);
+}
+@media (max-width: 860px) {
+    .app-ledger { grid-template-columns: 1fr; gap: 10px; }
+    .app-ledger-center { order: -1; align-items: flex-start; text-align: left; }
+    .app-ledger-side.left .app-ledger-cell { align-items: flex-start; text-align: left; }
+    .app-ledger-cell { border: 0 !important; padding: 10px 4px; }
+}
+
+.app-dash-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr);
+    gap: 18px;
+}
+@media (max-width: 1100px) {
+    .app-dash-grid { grid-template-columns: 1fr; }
+}
+
+.app-balance {
+    font-family: var(--app-font-display);
+    font-style: italic;
+    font-weight: 700;
+    font-size: 34px;
+    line-height: 1.1;
+    margin-top: 4px;
+}
+
+/* Equity curve (EquityChart.razor). */
+.app-equity-scroll { overflow-x: auto; }
+.app-equity-scroll svg {
+    display: block;
+    width: 100%;
+    min-width: 560px;
+    height: auto;
+}
+.app-equity-scroll text { font-family: var(--app-font-numbers); }
+
+/* Hover read-out (wwwroot/js/equityChart.js): above the point, or below it near the top edge. */
+.app-equity { position: relative; }
+.app-equity-plot { cursor: crosshair; }
+.app-equity-tip {
+    position: absolute;
+    z-index: 2;
+    pointer-events: none;
+    display: none;
+    flex-direction: column;
+    gap: 1px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    background: var(--app-surface);
+    border: 1px solid var(--app-border);
+    box-shadow: 0 10px 24px -8px rgba(0,0,0,.6);
+    white-space: nowrap;
+    transform: translate(-50%, calc(-100% - 12px));
+}
+.app-equity-tip.is-visible { display: flex; }
+.app-equity-tip.is-below { transform: translate(-50%, 12px); }
+.app-equity-tip-date { font-size: 11px; color: var(--app-text-secondary); }
+.app-equity-tip-balance {
+    font-family: var(--app-font-numbers);
+    font-variant-numeric: tabular-nums;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--app-text-primary);
+}
+.app-equity-tip-result {
+    font-family: var(--app-font-numbers);
+    font-variant-numeric: tabular-nums;
+    font-size: 12px;
+}
+.app-equity-tip-result:empty { display: none; }
+
+/* Full screen: the browser's own (:fullscreen), or the stretched-card fallback (.is-maximized). */
+.app-equity-fullscreen {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 7px;
+    border: 1px solid var(--app-border);
+    background: transparent;
+    color: var(--app-text-secondary);
+    cursor: pointer;
+}
+.app-equity-fullscreen:hover { color: var(--app-text-primary); background: var(--app-surface-variant); }
+.app-equity-fs-exit { display: none; }
+.app-equity-card:fullscreen .app-equity-fs-enter,
+.app-equity-card.is-maximized .app-equity-fs-enter { display: none; }
+.app-equity-card:fullscreen .app-equity-fs-exit,
+.app-equity-card.is-maximized .app-equity-fs-exit { display: block; }
+.app-equity-card:fullscreen,
+.app-equity-card.is-maximized {
+    display: flex;
+    flex-direction: column;
+    padding: 28px 36px !important;
+    border-radius: 0;
+    background-color: var(--app-bg);
+    overflow: auto;
+}
+.app-equity-card.is-maximized {
+    position: fixed;
+    inset: 0;
+    z-index: 1500;
+}
+/* The chart takes the rest of the screen; the SVG scales to fit it without stretching. */
+.app-equity-card:fullscreen .app-equity,
+.app-equity-card.is-maximized .app-equity { flex: 1; min-height: 0; }
+.app-equity-card:fullscreen .app-equity-scroll,
+.app-equity-card.is-maximized .app-equity-scroll { height: 100%; }
+.app-equity-card:fullscreen .app-equity-scroll svg,
+.app-equity-card.is-maximized .app-equity-scroll svg { height: 100%; }
+
+/* Diverging bar: gains grow right from the centre line, losses left. */
+.app-diverge {
+    position: relative;
+    height: 14px;
+}
+.app-diverge::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: -3px;
+    bottom: -3px;
+    width: 1px;
+    background: var(--app-text-secondary);
+    opacity: .5;
+}
+.app-diverge i {
+    position: absolute;
+    top: 2px;
+    bottom: 2px;
+    border-radius: 2px;
+}
+.app-diverge i.gain { left: 50%; background: var(--app-accent); }
+.app-diverge i.loss { right: 50%; background: var(--app-error); }
+.app-diverge span {
+    position: absolute;
+    top: 0;
+    font-family: var(--app-font-numbers);
+    font-size: 11.5px;
+    line-height: 14px;
+    white-space: nowrap;
+}
+
+.app-breakdown-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.3fr) auto;
+    gap: 12px;
+    align-items: center;
+    padding-block: 9px;
+    border-top: 1px solid var(--app-border);
+}
+.app-breakdown-row:first-of-type { border-top: 0; }
+.app-breakdown-name {
+    font-weight: 600;
+    font-size: 13.5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.app-breakdown-name small {
+    display: block;
+    font-weight: 400;
+    font-size: 11.5px;
+    color: var(--app-text-secondary);
+}
+.app-breakdown-value {
+    min-width: 84px;
+    text-align: right;
+    font-size: 13px;
+}
+
+/* Recent trades: direction as a small up/down triangle. */
+.app-dir {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .05em;
+    white-space: nowrap;
+}
+.app-dir::before {
+    content: "";
+    display: inline-block;
+    margin-right: 5px;
+    vertical-align: 1px;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+}
+.app-dir.long { color: var(--app-accent); }
+.app-dir.long::before { border-bottom: 6px solid currentColor; }
+.app-dir.short { color: var(--app-error); }
+.app-dir.short::before { border-top: 6px solid currentColor; }
+.app-recent-trades .app-pl-cell { width: 240px; min-width: 200px; }
+.app-recent-trades .app-pl-cell .app-diverge { height: 16px; }
+.app-recent-trades .app-pl-cell .app-diverge span { line-height: 16px; }
 
 /* ---------- Data check / Backup ---------- */
 
 .app-nav-badge {
-    margin-left: auto;
+    margin-left: 2px;
     min-width: 20px;
-    height: 20px;
+    height: 18px;
     padding: 0 6px;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--app-error) 20%, transparent);
-    color: var(--app-error);
-    font-size: 11px;
+    background: var(--app-error);
+    color: var(--app-spine-text);
+    font-size: 10.5px;
+    font-family: var(--app-font-numbers);
     font-weight: 700;
     display: inline-flex;
     align-items: center;
@@ -605,3 +947,17 @@ h1:focus {
         padding-top: 4px;
     }
 }
+
+/* Trades / New Trade: the net result under the add-ons. */
+.app-addon-net {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 12px;
+    margin: 8px 0 6px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--app-surface-variant);
+    font-size: 13px;
+}
+.app-addon-net-parts { color: var(--app-text-secondary); font-size: 12px; }

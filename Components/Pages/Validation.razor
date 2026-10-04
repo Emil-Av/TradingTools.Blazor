@@ -8,22 +8,14 @@
 
 <PageTitle>Data check</PageTitle>
 
-<TopBar Title="Data check" />
-
 <div class="app-content">
 
-    <div style="display:flex; align-items:flex-end; justify-content:space-between; flex-wrap:wrap; gap:12px;">
-        <div>
-            <MudText Typo="Typo.h5" Style="font-weight:800;">Data check</MudText>
-            <MudText Typo="Typo.body2" Style="color:var(--app-text-secondary); margin-top:4px;">
-                Every trade is checked in the background after each change: all Trade Data and Research fields filled,
-                exit price on the right side of the entry for the direction and outcome, and P&amp;L = |exit − entry| in points.
-            </MudText>
-        </div>
+    <TopBar Title="Data check"
+            Subtitle="Every trade is checked in the background after each change: all Trade Data and Research fields filled, exit price on the right side of the entry for the direction and outcome, and P&L = |exit − entry| in points.">
         <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh" OnClick="Monitor.RequestValidation" Disabled="Monitor.IsRunning">
             @(Monitor.IsRunning ? "Checking…" : "Check now")
         </MudButton>
-    </div>
+    </TopBar>
 
     @if (Monitor.LastError is { } error)
     {

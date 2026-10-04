@@ -35,6 +35,13 @@ namespace TradingTools.Blazor.Services.Dashboard
 
         public static string ShortDate(DateOnly date) => date.ToString("dd MMM yyyy", Culture);
 
+        /// <summary>CSS class coloring an amount as it is displayed: gain, loss, or flat when it rounds to zero.</summary>
+        public static string ToneClass(double value)
+        {
+            double rounded = Math.Round(value, 2, MidpointRounding.AwayFromZero);
+            return rounded > 0 ? "app-gain" : rounded < 0 ? "app-loss" : "app-flat";
+        }
+
         /// <summary>Expects an already rounded value, so a sign is never shown on something displayed as zero.</summary>
         private static string Sign(double rounded) => rounded > 0 ? "+" : rounded < 0 ? "−" : "";
     }

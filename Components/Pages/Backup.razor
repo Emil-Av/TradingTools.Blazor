@@ -6,16 +6,9 @@
 
 <PageTitle>Backup</PageTitle>
 
-<TopBar Title="Backup" />
-
 <div class="app-content">
 
-    <div>
-        <MudText Typo="Typo.h5" Style="font-weight:800;">Backup</MudText>
-        <MudText Typo="Typo.body2" Style="color:var(--app-text-secondary); margin-top:4px;">
-            Export or restore the database and the screenshots. They're separate files - keep both to restore everything.
-        </MudText>
-    </div>
+    <TopBar Title="Backup" Subtitle="Export or restore the database and the screenshots. They're separate files - keep both to restore everything." />
 
     @if (!string.IsNullOrEmpty(Message))
     {

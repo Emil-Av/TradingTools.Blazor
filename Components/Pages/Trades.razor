@@ -1,13 +1,15 @@
 @page "/trades"
 @rendermode InteractiveServer
+@using TradingTools.Blazor.Services.AddOns
+@using TradingTools.Blazor.Services.Dashboard
 
 <MudProviders />
 
 <PageTitle>Trades</PageTitle>
 
-<TopBar Title="Trades" />
-
 <div class="app-content">
+
+<TopBar Title="Trades" />
 
 @if (_loading)
 {
@@ -69,8 +71,11 @@ else
         <div class="app-card" style="width:100%; padding:16px; display:flex; flex-direction:column; gap:12px;">
             @if (CurrentBase!.ScreenshotsUrls is { Count: > 0 } urls)
             {
-                <div style="position:relative; height:78vh; border-radius:12px; overflow:hidden; background:#050a07; border:1px solid var(--app-border);">
-                    <img src="@("/" + urls[_screenshotIndex])" style="display:block; width:100%; height:100%; object-fit:cover;" />
+                @* The whole screenshot is always shown, never cropped: it fills the width at its own proportions,
+                   and is scaled down (contain) when that would be taller than 78% of the window. A fixed-size box
+                   with object-fit:cover cropped it whenever the window's shape differed from the screenshot's. *@
+                <div style="position:relative; border-radius:12px; overflow:hidden; background:var(--app-bg); border:1px solid var(--app-border);">
+                    <img src="@("/" + urls[_screenshotIndex])" alt="Screenshot @(_screenshotIndex + 1) of @urls.Count" style="display:block; width:100%; height:auto; max-height:78vh; object-fit:contain;" />
                     @if (urls.Count > 1)
                     {
                         <button class="app-carousel-btn" style="left:14px;" @onclick="PrevScreenshot"><MudIcon Icon="@Icons.Material.Filled.ChevronLeft" /></button>
@@ -118,15 +123,16 @@ else
                             </MudSelect>
                         </MudItem>
                         <MudItem xs="12" sm="6" md="4">
-                            <MudSelect Margin="Margin.Dense" T="EDirection" @bind-Value="CurrentBase.Direction" Label="Direction" Variant="Variant.Outlined">
+                            <MudSelect Margin="Margin.Dense" T="EDirection" @bind-Value="CurrentBase.Direction" @bind-Value:after="RecalculateOutcome" Label="Direction" Variant="Variant.Outlined">
                                 <MudSelectItem Value="EDirection.Long">Long</MudSelectItem>
                                 <MudSelectItem Value="EDirection.Short">Short</MudSelectItem>
                             </MudSelect>
                         </MudItem>
-                        <MudItem xs="12" sm="6" md="4"><MudNumericField Margin="Margin.Dense" T="double?" @bind-Value="CurrentBase.Amount" Label="Amount" Variant="Variant.Outlined"
+                        <MudItem xs="12" sm="6" md="4"><MudNumericField Margin="Margin.Dense" T="double?" @bind-Value="CurrentBase.Amount" @bind-Value:after="RecalculateOutcome" Label="Amount" Variant="Variant.Outlined"
                                                                          Error="@(IssueFor(nameof(BaseTrade.Amount)) is not null)" ErrorText="@IssueFor(nameof(BaseTrade.Amount))" /></MudItem>
                         <MudItem xs="12" sm="6" md="4">
-                            <MudSelect Margin="Margin.Dense" T="EOutcome" @bind-Value="CurrentBase.Outcome" Label="Outcome" Variant="Variant.Outlined">
+                            <MudSelect Margin="Margin.Dense" T="EOutcome" @bind-Value="CurrentBase.Outcome" Label="Outcome" Variant="Variant.Outlined"
+                                       Error="@(IssueFor(nameof(BaseTrade.Outcome)) is not null)" ErrorText="@IssueFor(nameof(BaseTrade.Outcome))">
                                 @foreach (var o in Enum.GetValues<EOutcome>())
                                 {
                                     <MudSelectItem Value="@o">@o</MudSelectItem>
@@ -185,7 +191,7 @@ else
                                              Error="@(AddOnIssue(index, nameof(TradeAddOn.EntryPrice)) is not null)" ErrorText="@AddOnIssue(index, nameof(TradeAddOn.EntryPrice))" />
                             <MudNumericField Margin="Margin.Dense" T="double?" Value="addOn.ExitPrice" ValueChanged="@(v => OnAddOnExitChanged(addOn, v))" Immediate="true" Label="Exit Price" Variant="Variant.Outlined" Format="F2"
                                              Error="@(AddOnIssue(index, nameof(TradeAddOn.ExitPrice)) is not null)" ErrorText="@AddOnIssue(index, nameof(TradeAddOn.ExitPrice))" />
-                            <MudNumericField Margin="Margin.Dense" T="double?" @bind-Value="addOn.Volume" Label="Volume" Variant="Variant.Outlined"
+                            <MudNumericField Margin="Margin.Dense" T="double?" @bind-Value="addOn.Volume" @bind-Value:after="RecalculateOutcome" Label="Volume" Variant="Variant.Outlined"
                                              Error="@(AddOnIssue(index, nameof(TradeAddOn.Volume)) is not null)" ErrorText="@AddOnIssue(index, nameof(TradeAddOn.Volume))" />
                             <MudNumericField Margin="Margin.Dense" T="double?" @bind-Value="addOn.PnL" Label="P&amp;L (points)" Variant="Variant.Outlined" Format="F2"
                                              Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Calculate" AdornmentAriaLabel="Recalculate from entry and exit" OnAdornmentClick="@(() => RecalculateAddOnPnl(addOn))"
@@ -195,7 +201,21 @@ else
                     }
                     @if (CurrentBase.AddOns.Count > 0)
                     {
-                        <MudText Typo="Typo.caption" Style="color:var(--app-text-secondary);">Add-ons are saved with the Update button, together with the rest of the trade data.</MudText>
+                        @* One trade, one result: the outcome follows the net of the main position and every add-on. *@
+                        <div class="app-addon-net">
+                            @if (CurrentNet is { } net)
+                            {
+                                <span>Net result of the whole trade</span>
+                                <span class="app-mono @DashboardFormat.ToneClass(net.NetEuro)">@DashboardFormat.SignedEuro(net.NetEuro)</span>
+                                <span>&rarr; <strong>@net.Outcome</strong></span>
+                                <span class="app-addon-net-parts">main <span class="app-mono">@DashboardFormat.SignedEuro(net.MainEuro)</span> · add-ons <span class="app-mono">@DashboardFormat.SignedEuro(net.AddOnsEuro)</span></span>
+                            }
+                            else
+                            {
+                                <span>Net result of the whole trade: fill in the amount, direction and every price and volume to see it.</span>
+                            }
+                        </div>
+                        <MudText Typo="Typo.caption" Style="color:var(--app-text-secondary);">The outcome is set from the net result. Add-ons are saved with the Update button, together with the rest of the trade data.</MudText>
                     }
                 </MudTabPanel>
 

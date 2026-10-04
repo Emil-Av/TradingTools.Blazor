@@ -2,6 +2,8 @@ using System.Globalization;
 using DataAccess.Data;
 using DataAccess.Repository;
 using DataAccess.Repository.IRepository;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Models;
@@ -48,6 +50,18 @@ builder.Services.AddRadzenComponents();
 // page and can't be exempted individually, breaking the app for anonymous visitors.
 builder.Services.AddCascadingAuthenticationState();
 
+// Sign-in cookies are encrypted with Data Protection keys that are scoped to the app's name, which by
+// default is its folder. On the VPS every deploy is a new release folder (see deploy.ps1), so without a
+// fixed name each deploy would sign everyone out.
+builder.Services.AddDataProtection().SetApplicationName("TradingTools.Blazor");
+
+// On the VPS the app sits behind nginx, which terminates HTTPS and passes the original scheme and client
+// address in X-Forwarded-* headers. nginx runs on the same machine, which the defaults already trust.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+});
+
 ConfigureDatabase(builder);
 ConfigureIdentity(builder);
 AddServices(builder);
@@ -57,6 +71,9 @@ var app = builder.Build();
 ApplyMigrations(app);
 ApplySymbolDataFix(app);
 MigrateLegacyScreenshots(app);
+
+// First, so everything after it (HTTPS redirection, cookies, antiforgery) sees https behind nginx.
+app.UseForwardedHeaders();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

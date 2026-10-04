@@ -1,64 +1,57 @@
 @using TradingTools.Blazor.Services.Validation
 @inject ITradeValidationMonitor ValidationMonitor
 
-<div class="app-sidebar">
-    <div class="app-brand">
-        <div class="app-brand-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 6"></polyline><polyline points="15 6 21 6 21 12"></polyline></svg>
-        </div>
-        <div class="app-brand-name">Trading Tools</div>
-    </div>
+<header class="app-header">
+    <a class="app-brand" href="">
+        @* Gain and loss strokes mirrored across a centre axis. *@
+        <svg class="app-brand-glyph" width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
+            <rect x="12.25" y="2" width="1.5" height="22" rx=".75" fill="currentColor"></rect>
+            <path d="M3 17 L7 11 L10 13.5" fill="none" stroke="var(--app-accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M23 9 L19 15 L16 12.5" fill="none" stroke="var(--app-error)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+        </svg>
+        <span class="app-brand-name">Trading Tools</span>
+    </a>
 
-    <div class="app-nav-heading">MAIN</div>
+    <nav class="app-nav" aria-label="Main">
+        <NavLink class="app-nav-item" href="" Match="NavLinkMatch.All">Dashboard</NavLink>
+        <NavLink class="app-nav-item" href="trades">Trades</NavLink>
+        <NavLink class="app-nav-item" href="research">Research</NavLink>
+        <NavLink class="app-nav-item" href="statistics">Statistics</NavLink>
+        <NavLink class="app-nav-item" href="calculator">Calculator</NavLink>
+        <NavLink class="app-nav-item" href="history">History</NavLink>
 
-    <NavLink class="app-nav-item" href="" Match="NavLinkMatch.All">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="1.5"></rect><rect x="13" y="3" width="8" height="8" rx="1.5"></rect><rect x="3" y="13" width="8" height="8" rx="1.5"></rect><rect x="13" y="13" width="8" height="8" rx="1.5"></rect></svg>
-        <span>Dashboard</span>
-    </NavLink>
-    <NavLink class="app-nav-item" href="trades">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20V10"></path><path d="M10 20V4"></path><path d="M17 20v-7"></path><path d="M3 20h18"></path></svg>
-        <span>Trades</span>
-    </NavLink>
-    <NavLink class="app-nav-item" href="research">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v6l-5 9a1.5 1.5 0 0 0 1.3 2.2h13.4A1.5 1.5 0 0 0 20 18l-5-9V3"></path><path d="M7.5 3h9"></path><path d="M8.5 14h7"></path></svg>
-        <span>Research</span>
-    </NavLink>
-    <NavLink class="app-nav-item" href="statistics">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 3v9l7 4"></path></svg>
-        <span>Statistics</span>
-    </NavLink>
-    <NavLink class="app-nav-item" href="calculator">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2.5" width="14" height="19" rx="2"></rect><path d="M8 7h8"></path><path d="M8 11h.01"></path><path d="M12 11h.01"></path><path d="M16 11h.01"></path><path d="M8 15h.01"></path><path d="M12 15h.01"></path><path d="M16 15h.01"></path></svg>
-        <span>Calculator</span>
-    </NavLink>
-    <NavLink class="app-nav-item" href="history">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3.5 2"></path></svg>
-        <span>History</span>
-    </NavLink>
+        <span class="app-nav-sep" aria-hidden="true"></span>
 
-    <div class="app-nav-heading" style="margin-top:12px;">DATA</div>
+        <NavLink class="app-nav-item" href="validation">
+            Data check
+            @* The header is part of the (static) layout, so the count is as of the page load. *@
+            @if (ValidationMonitor.LatestReport is { InvalidTrades.Count: > 0 } report)
+            {
+                <span class="app-nav-badge" title="Trades with invalid data">@report.InvalidTrades.Count</span>
+            }
+        </NavLink>
+        <NavLink class="app-nav-item" href="backup">Backup</NavLink>
+    </nav>
 
-    <NavLink class="app-nav-item" href="validation">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6l8-3z"></path><path d="M9 12l2 2 4-4"></path></svg>
-        <span>Data check</span>
-        @* The sidebar is part of the (static) layout, so the count is as of the page load. *@
-        @if (ValidationMonitor.LatestReport is { InvalidTrades.Count: > 0 } report)
-        {
-            <span class="app-nav-badge" title="Trades with invalid data">@report.InvalidTrades.Count</span>
-        }
-    </NavLink>
-    <NavLink class="app-nav-item" href="backup">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.5"></ellipse><path d="M4.5 5.5v6c0 1.4 3.4 2.5 7.5 2.5s7.5-1.1 7.5-2.5v-6"></path><path d="M4.5 11.5v6c0 1.4 3.4 2.5 7.5 2.5s7.5-1.1 7.5-2.5v-6"></path></svg>
-        <span>Backup</span>
-    </NavLink>
-
-    <div class="app-sidebar-footer">
-        <div style="display:flex; align-items:center; gap:10px; padding-top:14px;">
-            <div class="app-avatar">EA</div>
-            <div style="line-height:1.25;">
-                <div style="font-size:13px; font-weight:700;">Emil</div>
-                <div style="font-size:11px; color:var(--app-text-secondary);">Personal account</div>
+    <div class="app-header-actions">
+        @* A real link rather than a click handler: the layout is static, and a Blazor handler does
+           nothing without an active circuit. *@
+        <NavLink href="new-trade" class="app-btn-primary">New trade</NavLink>
+        <details class="app-account-menu">
+            <summary class="app-avatar" title="Account menu">EA</summary>
+            <div class="app-account-menu-panel">
+                <div class="app-account-menu-user">
+                    <div class="app-account-menu-name">Emil</div>
+                    <div class="app-account-menu-sub">Personal account</div>
+                </div>
+                <hr class="app-account-menu-divider" />
+                <form method="post" action="/account/logout">
+                    <button type="submit" class="app-account-menu-logout">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                        Logout
+                    </button>
+                </form>
             </div>
-        </div>
+        </details>
     </div>
-</div>
+</header>

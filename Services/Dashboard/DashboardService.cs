@@ -4,6 +4,7 @@ using Shared.Enums;
 using SharedEnums.Enums;
 using TradingTools.Blazor.Services.AddOns;
 using TradingTools.Blazor.Services.Interfaces;
+using TradingTools.Blazor.Services.Validation;
 
 namespace TradingTools.Blazor.Services.Dashboard
 {
@@ -56,9 +57,15 @@ namespace TradingTools.Blazor.Services.Dashboard
         /// falls back to |exit - entry| only when P&amp;L wasn't filled in - the Direction field isn't
         /// reliable enough to derive the sign from prices, so Outcome decides it either way.
         /// A win/loss with 0 points is treated as not filled in rather than as a 0-point result.
+        ///
+        /// With add-ons the Outcome belongs to the whole trade (its net result), not to the main position:
+        /// the main position can win while the add-ons lose more. So there its sign comes from its prices and
+        /// the direction, like the add-ons' do - and a "breakeven" trade still counts the main position's own points.
         /// </summary>
         internal static double? SignedPoints(BaseTrade trade)
         {
+            if (trade.AddOns.Count > 0) return MainPositionPoints(trade);
+
             if (trade.Outcome == EOutcome.Breakeven) return 0;
 
             double? magnitude =
@@ -69,6 +76,16 @@ namespace TradingTools.Blazor.Services.Dashboard
 
             if (magnitude is null) return null;
             return trade.Outcome == EOutcome.Win ? magnitude : -magnitude;
+        }
+
+        /// <summary>The main position of a trade with add-ons: signed by its prices and direction; null when they don't say.</summary>
+        private static double? MainPositionPoints(BaseTrade trade)
+        {
+            if (TradeNet.ResultSign(trade.EntryPrice, trade.ExitPrice, trade.Direction) is not { } sign) return null;
+            if (sign == 0) return 0;
+
+            double? magnitude = trade.PnL is { } pnl && pnl != 0 ? Math.Abs(pnl) : TradePnl.Points(trade.EntryPrice, trade.ExitPrice);
+            return sign * magnitude;
         }
 
         private static string NormalizeSymbol(string? symbol) =>

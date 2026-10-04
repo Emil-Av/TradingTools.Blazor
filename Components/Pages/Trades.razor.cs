@@ -79,6 +79,7 @@ namespace TradingTools.Blazor.Components.Pages
             if (CurrentBase is null) return;
             CurrentBase.EntryPrice = value;
             RecalculatePnl();
+            RecalculateOutcome();
         }
 
         private void OnExitPriceChanged(double? value)
@@ -86,6 +87,7 @@ namespace TradingTools.Blazor.Components.Pages
             if (CurrentBase is null) return;
             CurrentBase.ExitPrice = value;
             RecalculatePnl();
+            RecalculateOutcome();
         }
 
         /// <summary>P&amp;L = |exit - entry|, as long as both prices are there; otherwise it's left as it is.</summary>
@@ -101,20 +103,45 @@ namespace TradingTools.Blazor.Components.Pages
 
         private string? AddOnIssue(int index, string property) => IssueFor(TradeValidator.AddOnField(index, property));
 
-        private void AddAddOn() => CurrentBase?.AddOns.Add(TradeAddOns.NewFor(CurrentBase));
+        /// <summary>The whole trade's result in euro (main position + add-ons); null without add-ons or while something is missing.</summary>
+        private TradeNetResult? CurrentNet => CurrentBase is { AddOns.Count: > 0 } trade ? TradeNet.Calculate(trade) : null;
 
-        private void RemoveAddOn(TradeAddOn addOn) => CurrentBase?.AddOns.Remove(addOn);
+        /// <summary>
+        /// With add-ons the Outcome is the net result of the whole trade, so it follows the prices, amount,
+        /// direction and volumes as they're changed. It can still be changed by hand - the validation then says
+        /// if it disagrees with the net result.
+        /// </summary>
+        private void RecalculateOutcome()
+        {
+            if (CurrentBase is not null && CurrentNet is { } net)
+                CurrentBase.Outcome = net.Outcome;
+        }
 
-        private static void OnAddOnEntryChanged(TradeAddOn addOn, double? value)
+        private void AddAddOn()
+        {
+            if (CurrentBase is null) return;
+            CurrentBase.AddOns.Add(TradeAddOns.NewFor(CurrentBase));
+            RecalculateOutcome();
+        }
+
+        private void RemoveAddOn(TradeAddOn addOn)
+        {
+            CurrentBase?.AddOns.Remove(addOn);
+            RecalculateOutcome();
+        }
+
+        private void OnAddOnEntryChanged(TradeAddOn addOn, double? value)
         {
             addOn.EntryPrice = value;
             RecalculateAddOnPnl(addOn);
+            RecalculateOutcome();
         }
 
-        private static void OnAddOnExitChanged(TradeAddOn addOn, double? value)
+        private void OnAddOnExitChanged(TradeAddOn addOn, double? value)
         {
             addOn.ExitPrice = value;
             RecalculateAddOnPnl(addOn);
+            RecalculateOutcome();
         }
 
         /// <summary>Same rule as the trade itself: |exit - entry| once both prices are there.</summary>

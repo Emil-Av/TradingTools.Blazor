@@ -7,6 +7,7 @@ using MudBlazor;
 using Shared.Enums;
 using SharedEnums.Enums;
 using TradingTools.Blazor.Services;
+using TradingTools.Blazor.Services.AddOns;
 using TradingTools.Blazor.Services.Interfaces;
 using TradingTools.Blazor.Services.Validation;
 
@@ -54,27 +55,50 @@ namespace TradingTools.Blazor.Components.Pages
         {
             _entryPrice = value;
             _pnl = TradePnl.Points(_entryPrice, _exitPrice) ?? _pnl;
+            RecalculateOutcome();
         }
 
         private void OnExitPriceChanged(double? value)
         {
             _exitPrice = value;
             _pnl = TradePnl.Points(_entryPrice, _exitPrice) ?? _pnl;
+            RecalculateOutcome();
         }
 
         // A new add-on starts with the trade's exit price: usually the whole position is closed at once.
-        private void AddAddOn() => _addOns.Add(new TradeAddOn { ExitPrice = _exitPrice });
+        private void AddAddOn()
+        {
+            _addOns.Add(new TradeAddOn { ExitPrice = _exitPrice });
+            RecalculateOutcome();
+        }
 
-        private static void OnAddOnEntryChanged(TradeAddOn addOn, double? value)
+        private void RemoveAddOn(TradeAddOn addOn)
+        {
+            _addOns.Remove(addOn);
+            RecalculateOutcome();
+        }
+
+        private void OnAddOnEntryChanged(TradeAddOn addOn, double? value)
         {
             addOn.EntryPrice = value;
             addOn.PnL = TradePnl.Points(addOn.EntryPrice, addOn.ExitPrice) ?? addOn.PnL;
+            RecalculateOutcome();
         }
 
-        private static void OnAddOnExitChanged(TradeAddOn addOn, double? value)
+        private void OnAddOnExitChanged(TradeAddOn addOn, double? value)
         {
             addOn.ExitPrice = value;
             addOn.PnL = TradePnl.Points(addOn.EntryPrice, addOn.ExitPrice) ?? addOn.PnL;
+            RecalculateOutcome();
+        }
+
+        /// <summary>The whole trade's result in euro (main position + add-ons); null without add-ons or while something is missing.</summary>
+        private TradeNetResult? Net => _addOns.Count > 0 ? TradeNet.Calculate(_direction, _entryPrice, _exitPrice, _amount, _addOns) : null;
+
+        /// <summary>With add-ons the outcome is the net result of the whole trade (it can still be changed by hand).</summary>
+        private void RecalculateOutcome()
+        {
+            if (Net is { } net) _outcome = net.Outcome;
         }
 
         private void OnFilesSelected(InputFileChangeEventArgs e)

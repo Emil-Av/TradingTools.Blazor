@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="coverlet.collector" Version="6.0.2" />
+    <PackageReference Include="coverlet.collector" Version="6.0.2" /> 
     <!-- Kept below 8.0 on purpose: 7.x is Apache-2.0 (free for any use); from 8.0 FluentAssertions is
          under Xceed's Community License, free only for non-commercial use, otherwise paid. -->
     <PackageReference Include="FluentAssertions" Version="[7.2.2, 8.0.0)" />

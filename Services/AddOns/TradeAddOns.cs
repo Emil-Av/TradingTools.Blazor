@@ -31,13 +31,7 @@ namespace TradingTools.Blazor.Services.AddOns
         /// from the trade's direction and the add-on's prices: a long add-on wins when it's closed
         /// above its entry, a short one when it's closed below. Null when either price is missing.
         /// </summary>
-        public static double? SignedPoints(TradeAddOn addOn, EDirection direction)
-        {
-            if (TradePnl.Points(addOn.EntryPrice, addOn.ExitPrice) is not { } points) return null;
-
-            bool closedAbove = addOn.ExitPrice > addOn.EntryPrice;
-            bool won = direction == EDirection.Long ? closedAbove : !closedAbove;
-            return won || points == 0 ? points : -points;
-        }
+        public static double? SignedPoints(TradeAddOn addOn, EDirection direction) =>
+            TradeNet.SignedPoints(addOn.EntryPrice, addOn.ExitPrice, direction);
     }
 }

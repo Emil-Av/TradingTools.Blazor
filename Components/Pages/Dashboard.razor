@@ -6,111 +6,143 @@
 
 <PageTitle>Dashboard</PageTitle>
 
-<TopBar Title="Dashboard" />
-
 <div class="app-content">
 
-    <div style="display:flex; align-items:flex-end; justify-content:space-between; flex-wrap:wrap; gap:12px;">
-        <div>
-            <MudText Typo="Typo.h5" Style="font-weight:800;">Dashboard</MudText>
-            <MudText Typo="Typo.body2" Style="color:var(--app-text-secondary); margin-top:4px;">
-                SRS &amp; Espresso &mdash; @DateTime.Now.ToString("dddd, MMMM d", System.Globalization.CultureInfo.InvariantCulture)
-            </MudText>
-        </div>
-        @if (_accounts.Count > 0)
-        {
-            @* Wrapped: MudSelect renders a sibling element for its popover, which would otherwise take
-               part in this row's space-between layout. *@
-            <div style="width:220px;">
-                <MudSelect T="SampleSizeType" Value="_account" ValueChanged="SelectAccount" Label="Account" Dense="true" Variant="Variant.Outlined">
-                    @foreach (var account in _accounts)
-                    {
-                        <MudSelectItem Value="@account">@MyEnumConverter.TradeTypeFromEnum(account)</MudSelectItem>
-                    }
-                </MudSelect>
+    <TopBar Title="Dashboard" Subtitle="@($"{DashboardSelection.StrategyLabel(_strategy)} · {DateTime.Now.ToString("dddd, MMMM d", System.Globalization.CultureInfo.InvariantCulture)}")">
+        <div class="app-seg-group">
+            <div class="app-seg" role="group" aria-label="Strategy">
+                @foreach (var strategy in DashboardSelection.Strategies)
+                {
+                    <button type="button" aria-pressed="@(strategy == _strategy ? "true" : "false")" @onclick="() => SelectStrategy(strategy)">
+                        @DashboardSelection.StrategyLabel(strategy)
+                    </button>
+                }
             </div>
-        }
-    </div>
+            <div class="app-seg" role="group" aria-label="Account">
+                @foreach (var account in DashboardSelection.Accounts)
+                {
+                    <button type="button" aria-pressed="@(account == _account ? "true" : "false")" @onclick="() => SelectAccount(account)">
+                        @MyEnumConverter.TradeTypeFromEnum(account)
+                    </button>
+                }
+            </div>
+        </div>
+    </TopBar>
 
     @if (_loading)
     {
-        <MudProgressLinear Indeterminate="true" Color="Color.Success" />
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
     }
-    else if (_summary is null)
+    else if (_summary is null || _accountTrades.Count == 0)
     {
         <div class="app-card" style="padding:48px; text-align:center;">
             <MudText Typo="Typo.h6">No trades yet</MudText>
-            <MudText Typo="Typo.body2" Style="color:var(--app-text-secondary); margin-top:6px;">Closed SRS and Espresso trades will show up here.</MudText>
+            <MudText Typo="Typo.body2" Style="color:var(--app-text-secondary); margin-top:6px;">
+                Closed @DashboardSelection.StrategyLabel(_strategy) trades on the @MyEnumConverter.TradeTypeFromEnum(_account) account will show up here.
+            </MudText>
         </div>
     }
     else
     {
-        <div class="app-kpi-grid">
-            @foreach (var kpi in _kpis)
-            {
-                <div class="app-card" style="padding:20px;">
-                    <div style="display:flex; align-items:center; justify-content:space-between;">
-                        <div style="font-size:12.5px; font-weight:700; color:var(--app-text-secondary); letter-spacing:.02em;">@kpi.Label</div>
-                        <div style="width:30px; height:30px; border-radius:8px; background:@(kpi.IsNegative ? "color-mix(in srgb, var(--app-error) 16%, transparent)" : "color-mix(in srgb, var(--app-accent) 16%, transparent)"); display:flex; align-items:center; justify-content:center;">
-                            <MudIcon Icon="@kpi.Icon" Size="Size.Small" Style="@($"color:{(kpi.IsNegative ? "var(--app-error)" : "var(--app-accent)")}")" />
-                        </div>
-                    </div>
-                    <div class="app-mono" style="font-size:24px; font-weight:600; margin-top:10px; color:@(kpi.IsNegative ? "var(--app-error)" : "var(--app-text-primary)");">@kpi.Value</div>
-                    <div style="font-size:12px; color:var(--app-text-secondary); margin-top:6px;">@kpi.Sub</div>
-                </div>
-            }
-        </div>
+        var s = _summary;
+        var streak = s.CurrentStreak;
 
-        <MudGrid Spacing="3">
-            <MudItem xs="12" md="8">
-                <div class="app-card" style="padding:22px 24px; height:100%;">
-                    <div style="display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:6px;">
-                        <div>
-                            <MudText Typo="Typo.subtitle1" Style="font-weight:700;">Equity Curve</MudText>
-                            <div class="app-mono" style="font-size:20px; font-weight:600; margin-top:2px; color:@(_summary.NetEuro < 0 ? "var(--app-error)" : "var(--app-accent)");">
-                                @DashboardFormat.Euro(_summary.Balance)
-                            </div>
-                        </div>
-                        <div style="text-align:right; font-size:12px; color:var(--app-text-secondary); line-height:1.6;">
-                            <div>Start <span class="app-mono">@DashboardFormat.Euro(DashboardStats.StartingBalance)</span> · Net <span class="app-mono">@DashboardFormat.SignedEuro(_summary.NetEuro)</span></div>
-                            <div>Max drawdown <span class="app-mono">@DashboardFormat.Euro(_maxDrawdown)</span></div>
-                        </div>
+        @* Gain figures on the left, their loss counterparts mirrored on the right, win rate in the centre. *@
+        <section class="app-ledger" aria-label="Key figures">
+            <div class="app-ledger-side left">
+                <div class="app-ledger-cell">
+                    <span class="app-label">Best streak</span>
+                    <span class="app-ledger-value app-gain">@(s.BestWinStreak)W</span>
+                    <span class="app-ledger-sub">wins in a row · BE ignored</span>
+                </div>
+                <div class="app-ledger-cell">
+                    <span class="app-label">Avg win</span>
+                    <span class="app-ledger-value app-gain">@(s.AvgWinPoints is { } w ? DashboardFormat.SignedPoints(w) : "—")</span>
+                    <span class="app-ledger-sub">per winning trade</span>
+                </div>
+            </div>
+
+            <div class="app-ledger-cell app-ledger-center">
+                <span class="app-label">Win rate</span>
+                <span class="app-ledger-value">@DashboardFormat.Percent(s.WinRate)</span>
+                <span class="app-ledger-sub">@(s.Wins)W · @(s.Losses)L · @(s.Breakevens) BE not counted</span>
+            </div>
+
+            <div class="app-ledger-side right">
+                <div class="app-ledger-cell">
+                    <span class="app-label">Avg loss</span>
+                    <span class="app-ledger-value app-loss">@(s.AvgLossPoints is { } l ? DashboardFormat.SignedPoints(l) : "—")</span>
+                    <span class="app-ledger-sub">per losing trade</span>
+                </div>
+                <div class="app-ledger-cell">
+                    <span class="app-label">Worst streak</span>
+                    <span class="app-ledger-value app-loss">@(s.WorstLossStreak)L</span>
+                    <span class="app-ledger-sub">
+                        losses in a row · now
+                        <span class="@(streak.Outcome == EOutcome.Win ? "app-gain" : streak.Outcome == EOutcome.Loss ? "app-loss" : "")">@StreakLabel(streak)</span>
+                    </span>
+                </div>
+            </div>
+        </section>
+
+        <div class="app-dash-grid">
+            <section class="app-card app-equity-card" style="padding:20px 22px;" aria-label="Equity curve">
+                <div style="display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:10px;">
+                    <div>
+                        <div style="font-size:15px; font-weight:700;">Equity curve</div>
+                        <div class="app-balance app-mono @(s.NetEuro < 0 ? "app-loss" : "")">@DashboardFormat.Euro(s.Balance)</div>
                     </div>
-                    <MudChart T="double" ChartType="ChartType.Line" ChartSeries="_equitySeries" ChartLabels="_equityLabels"
-                              Width="100%" Height="280px" MatchBoundsToSize="true" ChartOptions="_chartOptions" />
-                    <div style="font-size:11.5px; color:var(--app-text-secondary); margin-top:6px;">
-                        Each trade: points &times; volume = euro won or lost, add-ons included (each with its own volume).
-                        @if (_summary.TradesWithoutResult > 0)
-                        {
-                            <span>@_summary.TradesWithoutResult trade(s) without points or volume recorded are left out of the money figures.</span>
-                        }
+                    <div style="display:flex; align-items:flex-start; gap:14px;">
+                        <div style="text-align:right; font-size:12px; color:var(--app-text-secondary); line-height:1.7;">
+                            <div>Start <span class="app-mono">@DashboardFormat.Euro(DashboardStats.StartingBalance)</span> · Net <span class="app-mono @DashboardFormat.ToneClass(s.NetEuro)">@DashboardFormat.SignedEuro(s.NetEuro)</span> (<span class="app-mono">@ReturnLabel(s.NetEuro)</span>)</div>
+                            <div>Max drawdown <span class="app-mono app-loss">@DashboardFormat.Euro(_maxDrawdown)</span></div>
+                        </div>
+                        @* A plain onclick (not @onclick): full screen is handled in the browser (wwwroot/js/equityChart.js), no server round trip. *@
+                        <button type="button" class="app-equity-fullscreen" onclick="appEquityChart.toggleFullscreen(this)" title="Full screen (Esc to close)" aria-label="Toggle full screen">
+                            <svg class="app-equity-fs-enter" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+                            <svg class="app-equity-fs-exit" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /></svg>
+                        </button>
                     </div>
                 </div>
-            </MudItem>
-            <MudItem xs="12" md="4">
-                <div style="display:flex; flex-direction:column; gap:20px; height:100%;">
-                    <PerformanceBreakdown Title="Performance by Strategy" Rows="_byStrategy" />
-                    <PerformanceBreakdown Title="Performance by Symbol" Rows="_bySymbol" />
+                <EquityChart Points="_equity" />
+                <div style="font-size:11.5px; color:var(--app-text-secondary); margin-top:8px;">
+                    Each trade: points &times; volume = euro won or lost, add-ons included (each with its own volume).
+                    @if (s.TradesWithoutResult > 0)
+                    {
+                        <span>@s.TradesWithoutResult trade(s) without points or volume recorded are left out of the money figures.</span>
+                    }
                 </div>
-            </MudItem>
-        </MudGrid>
+            </section>
+
+            <section class="app-card" style="padding:20px 22px; display:flex; flex-direction:column; gap:20px;" aria-label="Performance breakdown">
+                @* With a single strategy selected, a by-strategy breakdown would be one row repeating the figures above. *@
+                @if (_strategy is null)
+                {
+                    <PerformanceBreakdown Title="By strategy" Rows="_byStrategy" />
+                }
+                <PerformanceBreakdown Title="By symbol" Rows="_bySymbol" />
+            </section>
+        </div>
 
         var filtered = FilteredTradesChronological;
         var filteredSummary = DashboardStats.Summarize(filtered);
+        double maxEuro = Math.Max(filtered.Select(t => Math.Abs(t.Euro ?? 0)).DefaultIfEmpty(0).Max(), 0.01);
 
-        <div class="app-card" style="padding:8px 0 4px;">
-            <div style="padding:14px 24px 6px;">
-                <MudText Typo="Typo.subtitle1" Style="font-weight:700;">Recent Trades</MudText>
-            </div>
+        <section class="app-card" style="padding:8px 0 4px;" aria-label="Recent trades">
+            <div style="padding:14px 22px 6px; font-size:15px; font-weight:700;">Recent trades</div>
 
-            <div style="display:flex; flex-wrap:wrap; gap:12px; padding:6px 24px 10px; align-items:center;">
-                <MudSelect T="string" Value="_filterStrategy" ValueChanged="OnStrategyFilterChanged" Label="Strategy" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:150px; flex:0 0 auto;">
-                    <MudSelectItem Value="@All">All</MudSelectItem>
-                    @foreach (var s in StrategyOptions)
-                    {
-                        <MudSelectItem Value="@s">@s</MudSelectItem>
-                    }
-                </MudSelect>
+            <div style="display:flex; flex-wrap:wrap; gap:12px; padding:6px 22px 10px; align-items:center;">
+                @* Only useful when the page shows both strategies. *@
+                @if (_strategy is null)
+                {
+                    <MudSelect T="string" Value="_filterStrategy" ValueChanged="OnStrategyFilterChanged" Label="Strategy" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:150px; flex:0 0 auto;">
+                        <MudSelectItem Value="@All">All</MudSelectItem>
+                        @foreach (var strategy in StrategyOptions)
+                        {
+                            <MudSelectItem Value="@strategy">@strategy</MudSelectItem>
+                        }
+                    </MudSelect>
+                }
                 <MudSelect T="string" Value="_filterTimeFrame" ValueChanged="OnTimeFrameFilterChanged" Label="Time frame" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:140px; flex:0 0 auto;">
                     <MudSelectItem Value="@All">All</MudSelectItem>
                     @foreach (var tf in TimeFrameOptions)
@@ -146,10 +178,10 @@
                 </div>
             </div>
 
-            <div style="padding:0 24px 8px; font-size:12px; color:var(--app-text-secondary);">
+            <div style="padding:0 22px 8px; font-size:12px; color:var(--app-text-secondary);">
                 @filtered.Count trades · @(filteredSummary.Wins)W / @(filteredSummary.Losses)L / @(filteredSummary.Breakevens) BE ·
                 Win rate <span class="app-mono">@DashboardFormat.Percent(filteredSummary.WinRate)</span> ·
-                Net <span class="app-mono" style="color:@(filteredSummary.NetEuro < 0 ? "var(--app-error)" : "var(--app-accent)");">@DashboardFormat.SignedEuro(filteredSummary.NetEuro)</span>
+                Net <span class="app-mono @DashboardFormat.ToneClass(filteredSummary.NetEuro)">@DashboardFormat.SignedEuro(filteredSummary.NetEuro)</span>
             </div>
 
             <MudTable T="DashboardTrade" @bind-CurrentPage="_currentPage" Items="@(Enumerable.Reverse(filtered))" Dense="true" Hover="true" Elevation="0" RowsPerPage="10" Class="app-recent-trades">
@@ -160,35 +192,30 @@
                     <MudTh>Strategy</MudTh>
                     <MudTh>TF</MudTh>
                     <MudTh>Sample</MudTh>
-                    <MudTh>Volume</MudTh>
-                    <MudTh>Points</MudTh>
-                    <MudTh>P&amp;L</MudTh>
+                    <MudTh Style="text-align:right;">Volume</MudTh>
+                    <MudTh Style="text-align:right;">Points</MudTh>
+                    <MudTh Style="text-align:center;">P&amp;L</MudTh>
                     <MudTh>Outcome</MudTh>
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="Date" Style="color:var(--app-text-secondary); white-space:nowrap;">@DashboardFormat.ShortDate(context.Date)</MudTd>
-                    <MudTd DataLabel="Symbol"><span class="app-mono" style="font-weight:700;">@context.Symbol</span></MudTd>
-                    <MudTd DataLabel="Dir"><span class="app-chip @(context.Direction == EDirection.Long ? "app-chip-green" : "app-chip-red")">@context.Direction</span></MudTd>
+                    <MudTd DataLabel="Symbol"><span class="app-mono" style="font-weight:600;">@context.Symbol</span></MudTd>
+                    <MudTd DataLabel="Dir"><span class="app-dir @(context.Direction == EDirection.Long ? "long" : "short")">@context.Direction.ToString().ToUpperInvariant()</span></MudTd>
                     <MudTd DataLabel="Strategy" Style="color:var(--app-text-secondary);">@MyEnumConverter.StrategyFromEnum(context.Strategy)</MudTd>
                     <MudTd DataLabel="TF" Style="color:var(--app-text-secondary);">@MyEnumConverter.TimeFrameFromEnum(context.TimeFrame)</MudTd>
                     <MudTd DataLabel="Sample" Style="color:var(--app-text-secondary);">#@context.SampleSizeNumber</MudTd>
-                    <MudTd DataLabel="Volume">
+                    <MudTd DataLabel="Volume" Style="text-align:right; white-space:nowrap;">
                         <span class="app-mono">@(context.Volume is { } v ? DashboardFormat.Number(v) : "—")</span>
                         @if (context.AddOns.Count > 0)
                         {
                             <span class="app-addon-count" title="@context.AddOns.Count add-on@(context.AddOns.Count == 1 ? "" : "s"), included in the points and P&amp;L">+@context.AddOns.Count</span>
                         }
                     </MudTd>
-                    <MudTd DataLabel="Points"><span class="app-mono">@(context.TotalPoints is { } p ? DashboardFormat.SignedPoints(p) : "—")</span></MudTd>
-                    <MudTd DataLabel="P&amp;L">
-                        @if (context.Euro is { } euro)
-                        {
-                            <span class="app-mono" style="font-weight:600; color:@(euro < 0 ? "var(--app-error)" : euro > 0 ? "var(--app-accent)" : "var(--app-text-secondary)");">@DashboardFormat.SignedEuro(euro)</span>
-                        }
-                        else
-                        {
-                            <span class="app-mono" style="color:var(--app-text-secondary);">—</span>
-                        }
+                    <MudTd DataLabel="Points" Style="text-align:right; white-space:nowrap;">
+                        <span class="app-mono @(context.TotalPoints is { } tone ? DashboardFormat.ToneClass(tone) : "app-flat")">@(context.TotalPoints is { } p ? DashboardFormat.SignedPoints(p) : "—")</span>
+                    </MudTd>
+                    <MudTd DataLabel="P&amp;L" Class="app-pl-cell">
+                        <DivergingBar Value="context.Euro" Max="maxEuro" Reach="22" ShowLabel="true" />
                     </MudTd>
                     <MudTd DataLabel="Outcome"><span class="app-chip @OutcomeChip(context.Outcome)">@context.Outcome</span></MudTd>
                 </RowTemplate>
@@ -199,7 +226,7 @@
                     <MudTablePager PageSizeOptions="PageSizes" />
                 </PagerContent>
             </MudTable>
-        </div>
+        </section>
     }
 
 </div>

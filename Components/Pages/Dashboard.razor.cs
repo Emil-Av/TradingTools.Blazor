@@ -18,23 +18,20 @@ namespace TradingTools.Blazor.Components.Pages
 
         private bool _loading = true;
 
-        // Every SRS/Espresso trade, oldest first; the dashboard shows one account type at a time,
-        // since each (demo, paper, live) is a separate account starting from DashboardStats.StartingBalance.
+        // Every SRS/Espresso trade, oldest first. The dashboard shows one account at a time (each is a
+        // separate account starting from DashboardStats.StartingBalance), with both strategies or one.
         private List<DashboardTrade> _allTrades = [];
-        private List<SampleSizeType> _accounts = [];
-        private SampleSizeType _account;
+        private SampleSizeType _account = DashboardSelection.DefaultAccount;
+        private Strategy? _strategy; // null = SRS and Espresso together
+
+        /// <summary>The selected account's trades of the selected strategy - everything on the page is based on these.</summary>
         private List<DashboardTrade> _accountTrades = [];
 
         private DashboardStats.Summary? _summary;
-        private List<Kpi> _kpis = [];
         private List<DashboardStats.EquityPoint> _equity = [];
         private double _maxDrawdown;
-        private List<ChartSeries<double>> _equitySeries = [];
-        private string[] _equityLabels = [];
         private List<DashboardStats.Breakdown> _byStrategy = [];
         private List<DashboardStats.Breakdown> _bySymbol = [];
-
-        private readonly ChartOptions _chartOptions = new() { ChartPalette = ["#19d472"] };
 
         // Recent trades filters (they only affect the grid, not the stats above it).
         private string _filterStrategy = All;
@@ -49,72 +46,46 @@ namespace TradingTools.Blazor.Components.Pages
         protected override async Task OnInitializedAsync()
         {
             _allTrades = await DashboardService.GetTradesAsync();
-            _accounts = [.. _allTrades.Select(t => t.AccountType).Distinct().OrderBy(a => a)];
-            if (_accounts.Count > 0)
-            {
-                // Demo trading is the account currently traded (and the New Trade page's default).
-                SelectAccount(_accounts.Contains(SampleSizeType.DemoTrading) ? SampleSizeType.DemoTrading : _accounts[0]);
-            }
+            Refresh();
             _loading = false;
         }
 
         private void SelectAccount(SampleSizeType account)
         {
             _account = account;
-            _accountTrades = [.. _allTrades.Where(t => t.AccountType == account)];
+            Refresh();
+        }
+
+        private void SelectStrategy(Strategy? strategy)
+        {
+            _strategy = strategy;
+            Refresh();
+        }
+
+        private void Refresh()
+        {
+            _accountTrades = DashboardSelection.Select(_allTrades, _account, _strategy);
 
             _summary = DashboardStats.Summarize(_accountTrades);
             _equity = DashboardStats.EquityCurve(_accountTrades);
             _maxDrawdown = DashboardStats.MaxDrawdown(_equity);
             _byStrategy = DashboardStats.BreakdownBy(_accountTrades, t => MyEnumConverter.StrategyFromEnum(t.Strategy));
             _bySymbol = DashboardStats.BreakdownBy(_accountTrades, t => t.Symbol);
-            _kpis = BuildKpis(_summary);
-            BuildEquityChart();
             ResetFilters();
         }
 
-        private List<Kpi> BuildKpis(DashboardStats.Summary s)
+        private static string StreakLabel(DashboardStats.Streak streak) => streak.Outcome switch
         {
-            var streak = s.CurrentStreak;
-            string streakValue = streak.Outcome switch
-            {
-                EOutcome.Win => $"{streak.Length} {(streak.Length == 1 ? "Win" : "Wins")}",
-                EOutcome.Loss => $"{streak.Length} {(streak.Length == 1 ? "Loss" : "Losses")}",
-                _ => "—"
-            };
-            double returnPct = s.NetEuro / DashboardStats.StartingBalance;
+            EOutcome.Win => $"{streak.Length}W",
+            EOutcome.Loss => $"{streak.Length}L",
+            _ => "—"
+        };
 
-            return
-            [
-                new("WIN RATE", DashboardFormat.Percent(s.WinRate), $"{s.Wins}W · {s.Losses}L · {s.Breakevens} BE not counted",
-                    Icons.Material.Filled.TrackChanges, s.WinRate < 0.5),
-                new("NET P&L", DashboardFormat.SignedEuro(s.NetEuro), $"{(returnPct >= 0 ? "+" : "−")}{DashboardFormat.Percent(Math.Abs(returnPct))} on {DashboardFormat.Euro(DashboardStats.StartingBalance)} start",
-                    Icons.Material.Filled.Euro, s.NetEuro < 0),
-                new("AVG WIN", s.AvgWinPoints is { } w ? DashboardFormat.SignedPoints(w) : "—", "points per winning trade",
-                    Icons.Material.Filled.TrendingUp, false),
-                new("AVG LOSS", s.AvgLossPoints is { } l ? DashboardFormat.SignedPoints(l) : "—", "points per losing trade",
-                    Icons.Material.Filled.TrendingDown, true),
-                new("CURRENT STREAK", streakValue, $"Best {s.BestWinStreak}W · Worst {s.WorstLossStreak}L · BE ignored",
-                    Icons.Material.Filled.LocalFireDepartment, streak.Outcome == EOutcome.Loss),
-            ];
-        }
-
-        private void BuildEquityChart()
+        /// <summary>Net result as a share of the starting balance, e.g. "+4.2%".</summary>
+        private static string ReturnLabel(double netEuro)
         {
-            _equitySeries =
-            [
-                new ChartSeries<double> { Name = "Balance", Data = new ChartData<double>([.. _equity.Select(p => Math.Round(p.Balance, 2))]) }
-            ];
-
-            // Label about six evenly spaced points plus the last one, so the axis stays readable with
-            // hundreds of trades. A regular label too close to the last one is dropped so they don't overlap.
-            int count = _equity.Count;
-            int last = count - 1;
-            int step = Math.Max(1, count / 6);
-            _equityLabels = [.. _equity.Select((point, index) =>
-                index == last || (index % step == 0 && last - index >= step / 2)
-                    ? point.Date?.ToString("dd MMM", CultureInfo.InvariantCulture) ?? "Start"
-                    : string.Empty)];
+            double ratio = netEuro / DashboardStats.StartingBalance;
+            return $"{(ratio >= 0 ? "+" : "−")}{DashboardFormat.Percent(Math.Abs(ratio))}";
         }
 
         #region Recent trades
@@ -206,7 +177,5 @@ namespace TradingTools.Blazor.Components.Pages
         };
 
         #endregion
-
-        private record Kpi(string Label, string Value, string Sub, string Icon, bool IsNegative);
     }
 }

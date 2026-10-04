@@ -30,6 +30,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Screenshots are user data written at runtime, not part of the app: never build them into the
+         static web assets or copy them into a publish (the VPS keeps its own - see deploy.ps1). They're
+         still served from disk by UseStaticFiles (Program.cs). -->
+    <Content Remove="wwwroot/Screenshots/**;wwwroot/ScreenshotsDev/**" />
+    <None Remove="wwwroot/Screenshots/**;wwwroot/ScreenshotsDev/**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="TradingTools.Blazor.Tests" />
   </ItemGroup>
 

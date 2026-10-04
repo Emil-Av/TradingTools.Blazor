@@ -2,6 +2,8 @@ using System.Globalization;
 using Models.Trades;
 using Shared.Enums;
 using SharedEnums.Enums;
+using TradingTools.Blazor.Services.AddOns;
+using TradingTools.Blazor.Services.Dashboard;
 
 namespace TradingTools.Blazor.Services.Validation
 {
@@ -11,7 +13,8 @@ namespace TradingTools.Blazor.Services.Validation
     /// <summary>
     /// Checks a single trade: every Trade Data and Research field is filled, the exit price is on the
     /// right side of the entry price for the direction and outcome, and the P&amp;L is the positive
-    /// number of points between entry and exit.
+    /// number of points between entry and exit. For a trade with add-ons the outcome is checked against
+    /// the net result of the whole trade instead of the main exit, and each add-on is checked too.
     /// </summary>
     public static class TradeValidator
     {
@@ -21,7 +24,10 @@ namespace TradingTools.Blazor.Services.Validation
 
             CheckTradeData(trade, issues);
             CheckResearch(trade, issues);
-            CheckExitSide(trade, issues);
+            // A trade with add-ons has one net result, which decides its outcome - the main position's exit
+            // can be on the "wrong" side for the outcome (it won, the add-ons lost more).
+            if (trade.AddOns.Count == 0) CheckExitSide(trade, issues);
+            else CheckNetOutcome(trade, issues);
             CheckPnl(trade, issues);
             CheckAddOns(trade, issues);
 
@@ -135,6 +141,21 @@ namespace TradingTools.Blazor.Services.Validation
                 issues.Add(new(nameof(BaseTrade.PnL),
                     $"P&L should be {Format(expected)} points (|exit {Format(trade.ExitPrice!.Value)} − entry {Format(trade.EntryPrice!.Value)}|), but is {Format(pnl)}."));
             }
+        }
+
+        /// <summary>
+        /// With add-ons the outcome is the sign of the whole trade's result in euro (see <see cref="TradeNet"/>):
+        /// a winning main position doesn't make a Win when the add-ons lose more. Nothing to check while a
+        /// price, the amount or a volume is still missing - those are reported on their own.
+        /// </summary>
+        private static void CheckNetOutcome(BaseTrade trade, List<TradeValidationIssue> issues)
+        {
+            if (!Enum.IsDefined(trade.Outcome) || TradeNet.Calculate(trade) is not { } net) return;
+            if (net.Outcome == trade.Outcome) return;
+
+            issues.Add(new(nameof(BaseTrade.Outcome),
+                $"Net result is {DashboardFormat.SignedEuro(net.NetEuro)} (main {DashboardFormat.SignedEuro(net.MainEuro)}, add-ons {DashboardFormat.SignedEuro(net.AddOnsEuro)}), " +
+                $"so the outcome should be {net.Outcome}, not {trade.Outcome}."));
         }
 
         /// <summary>

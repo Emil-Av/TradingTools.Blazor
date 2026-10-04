@@ -1,0 +1,41 @@
+@using System.Globalization
+@using TradingTools.Blazor.Services.Dashboard
+@* A euro amount as a bar from a centre line: gains grow right, losses left. Max is the amount that
+   fills Reach percent of the width; with ShowLabel the amount is written just past the bar's end. *@
+
+<div class="app-diverge">
+    @if (Value is { } value && Math.Round(value, 2) != 0)
+    {
+        string width = Pct(Math.Max(Math.Abs(value) / Max * Reach, 1.5));
+        if (value > 0)
+        {
+            <i class="gain" style="width:@width%;"></i>
+            @if (ShowLabel)
+            {
+                <span class="app-gain" style="left:calc(50% + @width% + 6px);">@DashboardFormat.SignedEuro(value)</span>
+            }
+        }
+        else
+        {
+            <i class="loss" style="width:@width%;"></i>
+            @if (ShowLabel)
+            {
+                <span class="app-loss" style="right:calc(50% + @width% + 6px);">@DashboardFormat.SignedEuro(value)</span>
+            }
+        }
+    }
+    else if (ShowLabel)
+    {
+        <span class="app-flat" style="left:calc(50% + 6px);">@(Value is null ? "—" : DashboardFormat.SignedEuro(0))</span>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public double? Value { get; set; }
+    [Parameter, EditorRequired] public double Max { get; set; }
+    /// <summary>Percent of the width the largest amount reaches from the centre (at most 50).</summary>
+    [Parameter] public double Reach { get; set; } = 50;
+    [Parameter] public bool ShowLabel { get; set; }
+
+    private static string Pct(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+}
