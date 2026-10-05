@@ -1,0 +1,75 @@
+@page "/reviews"
+@using TradingTools.Blazor.Services.Reviews
+@using TradingTools.Blazor.Services.Settings
+@inject IReviewService ReviewService
+@inject ISettingsService SettingsService
+@* Static (no interactivity needed): a list of links, loaded when the page opens. The count in the menu comes from
+   the same service. A review is due until it has text, so this list empties as the reviews are written. *@
+
+<PageTitle>Reviews</PageTitle>
+
+<div class="app-content">
+
+    <TopBar Title="Reviews"
+            Subtitle="After every 5 trades of a sample size a review of those 5 trades is to be done, and a summary of the whole sample size once it is complete (20 trades)." />
+
+    @if (_due.Count == 0)
+    {
+        <div class="app-card" style="padding:32px; display:flex; align-items:center; gap:14px;">
+            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Style="color:var(--app-accent);" />
+            <MudText Typo="Typo.body1" Style="font-weight:600;">No reviews to do.</MudText>
+        </div>
+    }
+    else
+    {
+        <MudText Typo="Typo.body2" Style="color:var(--app-text-secondary);">
+            @_due.Sum(d => d.Reviews.Count) @(_due.Sum(d => d.Reviews.Count) == 1 ? "review" : "reviews") to do in
+            @_due.Count @(_due.Count == 1 ? "sample size" : "sample sizes") on the
+            @MyEnumConverter.TradeTypeFromEnum(_account) account (the default account - change it in
+            <a href="settings" style="color:var(--app-accent);">Settings</a>). Click one to open it on the Trades page.
+        </MudText>
+
+        <div style="display:flex; flex-direction:column; gap:12px;">
+            @* Newest first: the sample sizes you're most likely still working on. *@
+            @foreach (var due in _due)
+            {
+                <a class="app-card app-review-due" href="@Link(due)">
+                    <div style="min-width:0;">
+                        <div style="font-weight:700;">
+                            @MyEnumConverter.StrategyFromEnum(due.Strategy) · @MyEnumConverter.TimeFrameFromEnum(due.TimeFrame) · @MyEnumConverter.TradeTypeFromEnum(due.Account)
+                        </div>
+                        <div style="font-size:12.5px; color:var(--app-text-secondary); margin-top:2px;">
+                            Sample size @due.SampleSizeNumber · @due.TradeCount of @ReviewSchedule.TradesPerSampleSize trades@(due.IsComplete ? " - complete" : "")
+                        </div>
+                        <div class="app-review-chips">
+                            @foreach (var kind in due.Reviews)
+                            {
+                                <span class="app-chip @(kind == due.Reviews[0] ? "app-chip-green" : "app-chip-neutral")" title="@ReviewSchedule.Covers(kind)">
+                                    @ReviewSchedule.Label(kind) · @ReviewSchedule.Covers(kind)
+                                </span>
+                            }
+                        </div>
+                    </div>
+                    <span class="app-btn-primary">
+                        <MudIcon Icon="@Icons.Material.Filled.RateReview" Size="Size.Small" /> Open @ReviewSchedule.Label(due.Reviews[0]).ToLowerInvariant()
+                    </span>
+                </a>
+            }
+        </div>
+    }
+
+</div>
+
+@code {
+    private IReadOnlyList<DueReview> _due = [];
+    private SampleSizeType _account;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _due = await ReviewService.GetDueAsync();
+        _account = await SettingsService.GetDefaultAccountAsync();
+    }
+
+    /// <summary>The Trades page opens the sample size on its Review tab, with the first review to do expanded.</summary>
+    private static string Link(DueReview due) => $"trades?sampleSizeId={due.SampleSizeId}&review={due.Reviews[0]}";
+}

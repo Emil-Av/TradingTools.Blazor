@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @using TradingTools.Blazor.Services.AddOns
 @using TradingTools.Blazor.Services.Dashboard
+@using TradingTools.Blazor.Services.Reviews
 
 <MudProviders />
 
@@ -112,6 +113,22 @@ else
                             <li>@issue.Message</li>
                         }
                     </ul>
+                </MudAlert>
+            }
+            @* A review is ready for this sample size: it is due until it has text. *@
+            @if (_dueReview is { Reviews.Count: > 0 } dueReview)
+            {
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mb-3">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+                        <span>
+                            <strong>@(dueReview.Reviews.Count == 1 ? "A review is" : $"{dueReview.Reviews.Count} reviews are") ready for this sample size:</strong>
+                            @string.Join(", ", dueReview.Reviews.Select(kind => $"{ReviewSchedule.Label(kind).ToLowerInvariant()} ({ReviewSchedule.Covers(kind)})")).
+                        </span>
+                        @if (_activeTab != ReviewTab)
+                        {
+                            <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Info" StartIcon="@Icons.Material.Filled.RateReview" OnClick="ShowReviewTab">Open review</MudButton>
+                        }
+                    </div>
                 </MudAlert>
             }
             <MudTabs @bind-ActivePanelIndex="_activeTab" Rounded="true" ApplyEffectsToContainer="true" TabPanelsClass="pa-4">
@@ -315,11 +332,26 @@ else
                     @if (_vm.CurrentSampleSize.Review is { } review)
                     {
                         <MudExpansionPanels MultiExpansion="true" Elevation="0" Class="app-expansion">
-                            <MudExpansionPanel Text="First"><RichTextEditor @bind-Value="review.First" /></MudExpansionPanel>
-                            <MudExpansionPanel Text="Second"><RichTextEditor @bind-Value="review.Second" /></MudExpansionPanel>
-                            <MudExpansionPanel Text="Third"><RichTextEditor @bind-Value="review.Third" /></MudExpansionPanel>
-                            <MudExpansionPanel Text="Forth"><RichTextEditor @bind-Value="review.Forth" /></MudExpansionPanel>
-                            <MudExpansionPanel Text="Summary"><RichTextEditor @bind-Value="review.Summary" /></MudExpansionPanel>
+                            @* A review of every 5 trades, then one for the whole sample size. The one that is to be done is open. *@
+                            @foreach (var kind in ReviewSchedule.All)
+                            {
+                                var current = kind;
+                                <MudExpansionPanel Expanded="_openReviews.Contains(current)" ExpandedChanged="@(open => SetReviewOpen(current, open))">
+                                    <TitleContent>
+                                        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                                            <span>@(current == ReviewKind.Summary ? "Summary" : current.ToString())</span>
+                                            <span style="font-size:11.5px; color:var(--app-text-secondary);">@ReviewSchedule.Covers(current)</span>
+                                            @if (IsDue(current))
+                                            {
+                                                <span class="app-chip app-chip-green">To do</span>
+                                            }
+                                        </div>
+                                    </TitleContent>
+                                    <ChildContent>
+                                        <RichTextEditor Value="@ReviewSchedule.TextOf(review, current)" ValueChanged="@(text => ReviewSchedule.SetText(review, current, text))" />
+                                    </ChildContent>
+                                </MudExpansionPanel>
+                            }
                         </MudExpansionPanels>
                     }
                     else

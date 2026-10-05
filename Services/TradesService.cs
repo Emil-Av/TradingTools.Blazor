@@ -387,6 +387,9 @@ namespace TradingTools.Blazor.Services
             return trade.ScreenshotsUrls;
         }
 
+        public async Task<bool> SampleSizeExistsAsync(int sampleSizeId) =>
+            await _unitOfWork.SampleSize.GetAsync(s => s.Id == sampleSizeId && s.SampleSizeType != SampleSizeType.Research) is not null;
+
         public async Task<int?> GetSampleSizeIdOfTradeAsync(int tradeId) =>
             (await _unitOfWork.BaseTrade.GetAsync(t => t.Id == tradeId))?.SampleSizeId;
     }

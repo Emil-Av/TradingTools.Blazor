@@ -9,6 +9,7 @@ using SharedEnums.Enums;
 using TradingTools.Blazor.Services;
 using TradingTools.Blazor.Services.AddOns;
 using TradingTools.Blazor.Services.Interfaces;
+using TradingTools.Blazor.Services.Reviews;
 using TradingTools.Blazor.Services.Settings;
 using TradingTools.Blazor.Services.Validation;
 
@@ -20,6 +21,8 @@ namespace TradingTools.Blazor.Components.Pages
         [Inject] private ISnackbar Snackbar { get; set; } = default!;
         [Inject] private IJSRuntime JS { get; set; } = default!;
         [Inject] private ISettingsService SettingsService { get; set; } = default!;
+        [Inject] private IReviewService ReviewService { get; set; } = default!;
+        [Inject] private NavigationManager Navigation { get; set; } = default!;
 
         private const long MaxFileSizeBytes = 10 * 1024 * 1024;
 
@@ -149,6 +152,36 @@ namespace TradingTools.Blazor.Components.Pages
             };
         }
 
+        /// <summary>
+        /// The trade just saved may have completed a block of 5 trades (or the whole sample size): then the review of it
+        /// is ready, and a notification with a link to it stays on screen until it's dismissed or clicked. Reviews that are
+        /// already waiting from earlier are not repeated here - the Reviews page and the menu count show those.
+        /// </summary>
+        private async Task NotifyIfReviewReadyAsync(BaseTrade? saved)
+        {
+            if (saved is null || saved.SampleSizeId == 0) return;
+
+            var due = await ReviewService.GetDueForSampleSizeAsync(saved.SampleSizeId);
+            if (due is null) return;
+
+            var ready = ReviewSchedule.ReachedAt(due.TradeCount).Where(due.Reviews.Contains).ToList();
+            if (ready.Count == 0) return;
+
+            string what = string.Join(" and ", ready.Select(kind => ReviewSchedule.Label(kind).ToLowerInvariant()));
+            string link = $"trades?sampleSizeId={due.SampleSizeId}&review={due.Reviews[0]}";
+
+            Snackbar.Add($"Sample size {due.SampleSizeNumber} has {due.TradeCount} trades: the {what} {(ready.Count == 1 ? "is" : "are")} ready.", Severity.Info, config =>
+            {
+                config.RequireInteraction = true;
+                config.Action = "Open review";
+                config.OnClick = _ =>
+                {
+                    Navigation.NavigateTo(link);
+                    return Task.CompletedTask;
+                };
+            });
+        }
+
         private async Task SaveAsync()
         {
             if (_uploadedFiles.Count == 0)
@@ -184,6 +217,7 @@ namespace TradingTools.Blazor.Components.Pages
                 await NewTradeService.SaveTradeAsync(vm, formFiles.Cast<Microsoft.AspNetCore.Http.IFormFile>().ToArray());
 
                 Snackbar.Add("Trade saved.", Severity.Success);
+                await NotifyIfReviewReadyAsync((BaseTrade?)vm.SRSTrade ?? (BaseTrade?)vm.EspressoTrade ?? vm.BrunchBreakTrade);
                 ClearForm();
             }
             catch (Exception ex)

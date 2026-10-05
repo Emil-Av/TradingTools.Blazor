@@ -1,5 +1,7 @@
+@using TradingTools.Blazor.Services.Reviews
 @using TradingTools.Blazor.Services.Validation
 @inject ITradeValidationMonitor ValidationMonitor
+@inject IServiceScopeFactory ScopeFactory
 
 <header class="app-header">
     <a class="app-brand" href="">
@@ -16,6 +18,14 @@
         <NavLink class="app-nav-item" href="" Match="NavLinkMatch.All">Dashboard</NavLink>
         <NavLink class="app-nav-item" href="trades">Trades</NavLink>
         <NavLink class="app-nav-item" href="history">History</NavLink>
+        <NavLink class="app-nav-item" href="reviews">
+            Reviews
+            @* The header is part of the (static) layout, so the count is as of the page load. *@
+            @if (_reviewsDue > 0)
+            {
+                <span class="app-nav-badge" title="Reviews to do">@_reviewsDue</span>
+            }
+        </NavLink>
 
         <span class="app-nav-sep" aria-hidden="true"></span>
 
@@ -53,3 +63,24 @@
         </details>
     </div>
 </header>
+
+@code {
+    private int _reviewsDue;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // Own scope, so its own DbContext: the menu renders in the same request as the page, at the same time,
+            // and one DbContext can't run two queries at once.
+            await using var scope = ScopeFactory.CreateAsyncScope();
+            var reviews = scope.ServiceProvider.GetRequiredService<IReviewService>();
+            _reviewsDue = (await reviews.GetDueAsync()).Sum(d => d.Reviews.Count);
+        }
+        catch
+        {
+            // A failed lookup must never take the whole page down: the menu just shows no count.
+            _reviewsDue = 0;
+        }
+    }
+}

@@ -12,6 +12,7 @@ using SharedEnums.Enums;
 using TradingTools.Blazor.Services;
 using TradingTools.Blazor.Services.AddOns;
 using TradingTools.Blazor.Services.Calculation;
+using TradingTools.Blazor.Services.Reviews;
 using TradingTools.Blazor.Services.Settings;
 using TradingTools.Blazor.Services.Interfaces;
 using TradingTools.Blazor.Services.Validation;
@@ -27,9 +28,16 @@ namespace TradingTools.Blazor.Components.Pages
         [Inject] private IJSRuntime JS { get; set; } = default!;
         [Inject] private ITradeValidationMonitor ValidationMonitor { get; set; } = default!;
         [Inject] private ISettingsService SettingsService { get; set; } = default!;
+        [Inject] private IReviewService ReviewService { get; set; } = default!;
 
         /// <summary>Opens this trade directly, e.g. from the Data check page (/trades?tradeId=123).</summary>
         [SupplyParameterFromQuery] public int? TradeId { get; set; }
+
+        /// <summary>Opens this sample size (e.g. from the Reviews page: /trades?sampleSizeId=12&review=First).</summary>
+        [SupplyParameterFromQuery] public int? SampleSizeId { get; set; }
+
+        /// <summary>With <see cref="SampleSizeId"/>: the review to open, e.g. "First" or "Summary" (the Review tab opens).</summary>
+        [SupplyParameterFromQuery] public string? Review { get; set; }
 
         private const long MaxFileSizeBytes = 10 * 1024 * 1024;
 
@@ -169,6 +177,55 @@ namespace TradingTools.Blazor.Components.Pages
         private bool CanGoPrevSampleSize => SampleSizePosition > 0;
         private bool CanGoNextSampleSize => _vm is not null && SampleSizePosition < _vm.SampleSizes.Count - 1;
 
+        #region Reviews
+
+        /// <summary>Index of the Review tab.</summary>
+        private const int ReviewTab = 3;
+
+        /// <summary>The reviews still to do for the sample size on screen; null when there are none.</summary>
+        private DueReview? _dueReview;
+
+        /// <summary>The review panels that are open.</summary>
+        private readonly HashSet<ReviewKind> _openReviews = [];
+
+        private bool IsDue(ReviewKind kind) => _dueReview?.Reviews.Contains(kind) == true;
+
+        /// <summary>
+        /// A sample size is on screen (opened, or navigated to): work out its reviews and open the one that is to be
+        /// done, so it is ready when you go to the Review tab.
+        /// </summary>
+        private async Task OnSampleSizeShownAsync()
+        {
+            await LoadDueReviewAsync();
+
+            _openReviews.Clear();
+            if (_dueReview is { Reviews.Count: > 0 } due) _openReviews.Add(due.Reviews[0]);
+        }
+
+        private async Task LoadDueReviewAsync() =>
+            _dueReview = _vm is null ? null : await ReviewService.GetDueForSampleSizeAsync(_vm.CurrentSampleSize.Id);
+
+        private void OpenReview(ReviewKind kind)
+        {
+            _openReviews.Clear();
+            _openReviews.Add(kind);
+        }
+
+        private void SetReviewOpen(ReviewKind kind, bool open)
+        {
+            if (open) _openReviews.Add(kind);
+            else _openReviews.Remove(kind);
+        }
+
+        /// <summary>The banner's button: to the Review tab, with the first review to do open.</summary>
+        private void ShowReviewTab()
+        {
+            _activeTab = ReviewTab;
+            if (_dueReview is { Reviews.Count: > 0 } due) OpenReview(due.Reviews[0]);
+        }
+
+        #endregion
+
         protected override async Task OnInitializedAsync()
         {
             _spreads = await SettingsService.GetSpreadsAsync();
@@ -177,13 +234,28 @@ namespace TradingTools.Blazor.Components.Pages
             {
                 _vm = await TradesService.LoadSampleSizeNumberAsync(sampleSizeId);
                 ResetIndexes();
+                await OnSampleSizeShownAsync();
                 int index = _vm.AllTradesInSampleSize.FindIndex(t => t is BaseTrade trade && trade.Id == tradeId);
                 if (index >= 0) _tradeIndex = index;
+            }
+            else if (SampleSizeId is { } reviewSampleSizeId && await TradesService.SampleSizeExistsAsync(reviewSampleSizeId))
+            {
+                _vm = await TradesService.LoadSampleSizeNumberAsync(reviewSampleSizeId);
+                ResetIndexes();
+                await OnSampleSizeShownAsync();
+
+                // Coming from the Reviews page: the review that is to be done is open, on the Review tab.
+                if (Enum.TryParse<ReviewKind>(Review, ignoreCase: true, out var kind))
+                {
+                    _activeTab = ReviewTab;
+                    OpenReview(kind);
+                }
             }
             else
             {
                 _vm = await TradesService.InitializeTradesViewModelAsync();
                 ResetIndexes();
+                await OnSampleSizeShownAsync();
             }
             _loading = false;
         }
@@ -207,6 +279,7 @@ namespace TradingTools.Blazor.Components.Pages
             _loading = true;
             _vm = await TradesService.LoadSampleSizeNumberAsync(_vm.SampleSizes[SampleSizePosition - 1].Id);
             ResetIndexes();
+            await OnSampleSizeShownAsync();
             _loading = false;
         }
 
@@ -216,6 +289,7 @@ namespace TradingTools.Blazor.Components.Pages
             _loading = true;
             _vm = await TradesService.LoadSampleSizeNumberAsync(_vm.SampleSizes[SampleSizePosition + 1].Id);
             ResetIndexes();
+            await OnSampleSizeShownAsync();
             _loading = false;
         }
 
@@ -225,6 +299,7 @@ namespace TradingTools.Blazor.Components.Pages
             _loading = true;
             _vm = await TradesService.LoadStrategyAsync(strategy, _vm.CurrentSampleSize.SampleSizeType);
             ResetIndexes();
+            await OnSampleSizeShownAsync();
             _loading = false;
         }
 
@@ -234,6 +309,7 @@ namespace TradingTools.Blazor.Components.Pages
             _loading = true;
             _vm = await TradesService.LoadTypeAsync(type, _vm.CurrentSampleSize.Strategy);
             ResetIndexes();
+            await OnSampleSizeShownAsync();
             _loading = false;
         }
 
@@ -248,6 +324,7 @@ namespace TradingTools.Blazor.Components.Pages
                 TimeFrame = timeFrame
             });
             ResetIndexes();
+            await OnSampleSizeShownAsync();
             _loading = false;
         }
 
@@ -290,6 +367,9 @@ namespace TradingTools.Blazor.Components.Pages
                             review.Forth = Sanitize(review.Forth);
                             review.Summary = Sanitize(review.Summary);
                             await TradesService.UpdateReviewAsync(review);
+
+                            // What is still to do may have changed; the panels stay as they are (the one you wrote stays open).
+                            await LoadDueReviewAsync();
                         }
                         break;
                 }
@@ -350,6 +430,7 @@ namespace TradingTools.Blazor.Components.Pages
                 Snackbar.Add("Trade deleted.", Severity.Success);
                 _vm = await TradesService.InitializeTradesViewModelAsync();
                 ResetIndexes();
+                await OnSampleSizeShownAsync();
             }
             catch (Exception ex)
             {

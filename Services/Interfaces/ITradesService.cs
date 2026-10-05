@@ -11,6 +11,9 @@ namespace TradingTools.Blazor.Services.Interfaces
     {
         TradesVM InitializeNewTradeTradesViewModel();
         Task<TradesVM> InitializeTradesViewModelAsync();
+
+        /// <summary>Whether a sample size with this id exists (one the Trades page shows, so not research).</summary>
+        Task<bool> SampleSizeExistsAsync(int sampleSizeId);
         Task UpdateTradeDataAsync(BaseTrade tradeData);
         Task UpdateReviewAsync(Review review);
         Task UpdateJournalAsync(Journal journal);
