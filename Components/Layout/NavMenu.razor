@@ -18,25 +18,34 @@
         <NavLink class="app-nav-item" href="" Match="NavLinkMatch.All">Dashboard</NavLink>
         <NavLink class="app-nav-item" href="trades">Trades</NavLink>
         <NavLink class="app-nav-item" href="history">History</NavLink>
-        <NavLink class="app-nav-item" href="reviews">
-            Reviews
-            @* The header is part of the (static) layout, so the count is as of the page load. *@
-            @if (_reviewsDue > 0)
-            {
-                <span class="app-nav-badge" title="Reviews to do">@_reviewsDue</span>
-            }
-        </NavLink>
-
         <span class="app-nav-sep" aria-hidden="true"></span>
 
-        <NavLink class="app-nav-item" href="validation">
-            Data check
-            @* The header is part of the (static) layout, so the count is as of the page load. *@
-            @if (ValidationMonitor.LatestReport is { InvalidTrades.Count: > 0 } report)
-            {
-                <span class="app-nav-badge" title="Trades with invalid data">@report.InvalidTrades.Count</span>
-            }
-        </NavLink>
+        @* The header is part of the (static) layout, so the counts are as of the page load. *@
+        <details class="app-nav-menu">
+            <summary class="app-nav-item">
+                Data check
+                @if (_invalidTrades > 0 || _reviewsDue > 0)
+                {
+                    <span class="app-nav-dot" title="Something needs attention"></span>
+                }
+            </summary>
+            <div class="app-nav-menu-panel">
+                <NavLink class="app-nav-menu-item" href="validation">
+                    Trade validation
+                    @if (_invalidTrades > 0)
+                    {
+                        <span class="app-nav-badge" title="Trades with invalid data">@_invalidTrades</span>
+                    }
+                </NavLink>
+                <NavLink class="app-nav-menu-item" href="reviews">
+                    Reviews
+                    @if (_reviewsDue > 0)
+                    {
+                        <span class="app-nav-badge" title="Reviews to do">@_reviewsDue</span>
+                    }
+                </NavLink>
+            </div>
+        </details>
         <NavLink class="app-nav-item" href="backup">Backup</NavLink>
         <NavLink class="app-nav-item" href="settings">Settings</NavLink>
     </nav>
@@ -66,6 +75,7 @@
 
 @code {
     private int _reviewsDue;
+    private int _invalidTrades => ValidationMonitor.LatestReport?.InvalidTrades.Count ?? 0;
 
     protected override async Task OnInitializedAsync()
     {

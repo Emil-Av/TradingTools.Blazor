@@ -1058,3 +1058,66 @@ h1:focus {
 }
 .app-review-due:hover { background: var(--app-surface-variant); }
 .app-review-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+
+/* ---------- Data check dropdown (header nav) ---------- */
+
+.app-nav-menu > summary {
+    list-style: none;
+    cursor: pointer;
+}
+.app-nav-menu > summary::-webkit-details-marker,
+.app-nav-menu > summary::marker {
+    display: none;
+    content: "";
+}
+.app-nav-menu[open] > summary,
+.app-nav-menu:has(.app-nav-menu-item.active) > summary {
+    background: var(--app-surface);
+    color: var(--app-text-primary);
+    box-shadow: inset 0 0 0 1px var(--app-border);
+}
+.app-nav-menu > summary::after {
+    content: "";
+    width: 5px;
+    height: 5px;
+    margin: -3px 0 0 2px;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: rotate(45deg);
+}
+/* Fixed, not absolute: the nav scrolls horizontally on narrow screens and would clip it. dropdowns.js sets top/left. */
+.app-nav-menu-panel {
+    position: fixed;
+    min-width: 200px;
+    background: var(--app-surface);
+    border: 1px solid var(--app-border);
+    border-radius: 12px;
+    box-shadow: 0 14px 30px -10px rgba(0,0,0,0.8);
+    padding: 6px;
+    z-index: 40;
+}
+.app-nav-menu-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 9px 10px;
+    border-radius: 8px;
+    color: var(--app-text-primary);
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.app-nav-menu-item:hover {
+    background: var(--app-surface-variant);
+}
+.app-nav-menu-item.active {
+    color: var(--app-accent);
+}
+/* A plain mark on the menu itself: something inside needs attention, the numbers are in the menu. */
+.app-nav-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--app-error);
+}
