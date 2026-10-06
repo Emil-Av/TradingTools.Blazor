@@ -241,6 +241,7 @@ static void AddServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<ITradesService, TradesService>();
     builder.Services.AddScoped<TradingTools.Blazor.Services.Settings.ISettingsService, TradingTools.Blazor.Services.Settings.SettingsService>();
     builder.Services.AddScoped<TradingTools.Blazor.Services.Reviews.IReviewService, TradingTools.Blazor.Services.Reviews.ReviewService>();
+    builder.Services.AddScoped<TradingTools.Blazor.Services.Screenshots.ITradeScreenshotService, TradingTools.Blazor.Services.Screenshots.TradeScreenshotService>();
     builder.Services.AddScoped<TradingTools.Blazor.Services.AddOns.ITradeAddOnStore, TradingTools.Blazor.Services.AddOns.TradeAddOnStore>();
     builder.Services.AddScoped<IDashboardService, TradingTools.Blazor.Services.Dashboard.DashboardService>();
 

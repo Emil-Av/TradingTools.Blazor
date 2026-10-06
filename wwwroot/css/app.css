@@ -990,6 +990,11 @@ h1:focus {
     object-fit: contain;
 }
 .app-carousel-btn.app-carousel-fs { top: 14px; right: 14px; transform: none; }
+.app-carousel-btn.app-carousel-del { top: 14px; right: 58px; transform: none; }
+.app-carousel-btn.app-carousel-del:hover { color: var(--app-error); }
+.app-carousel-btn.app-carousel-del:disabled { opacity: .5; cursor: default; }
+.app-carousel:fullscreen .app-carousel-del,
+.app-carousel.is-maximized .app-carousel-del { display: none; }
 .app-carousel:fullscreen,
 .app-carousel.is-maximized {
     display: flex;

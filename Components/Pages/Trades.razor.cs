@@ -13,6 +13,7 @@ using TradingTools.Blazor.Services;
 using TradingTools.Blazor.Services.AddOns;
 using TradingTools.Blazor.Services.Calculation;
 using TradingTools.Blazor.Services.Reviews;
+using TradingTools.Blazor.Services.Screenshots;
 using TradingTools.Blazor.Services.Settings;
 using TradingTools.Blazor.Services.Interfaces;
 using TradingTools.Blazor.Services.Validation;
@@ -29,6 +30,7 @@ namespace TradingTools.Blazor.Components.Pages
         [Inject] private ITradeValidationMonitor ValidationMonitor { get; set; } = default!;
         [Inject] private ISettingsService SettingsService { get; set; } = default!;
         [Inject] private IReviewService ReviewService { get; set; } = default!;
+        [Inject] private ITradeScreenshotService ScreenshotService { get; set; } = default!;
 
         /// <summary>Opens this trade directly, e.g. from the Data check page (/trades?tradeId=123).</summary>
         [SupplyParameterFromQuery] public int? TradeId { get; set; }
@@ -398,6 +400,67 @@ namespace TradingTools.Blazor.Components.Pages
             catch (Exception ex)
             {
                 Snackbar.Add($"Error while uploading: {ex.Message}", Severity.Error);
+            }
+            finally
+            {
+                _saving = false;
+            }
+        }
+
+        /// <summary>
+        /// Deletes the screenshot on show - its path from the trade and its file from the Screenshots folder - after
+        /// asking. The screenshot is identified by its path, taken before the dialog opens.
+        /// </summary>
+        private async Task ConfirmDeleteScreenshotAsync()
+        {
+            if (CurrentBase?.ScreenshotsUrls is not { } urls || _screenshotIndex < 0 || _screenshotIndex >= urls.Count) return;
+
+            int tradeId = CurrentBase.Id;
+            int position = _screenshotIndex;
+            string path = urls[position];
+            string name = Path.GetFileName(path.Replace('\\', '/'));
+
+            bool? confirmed = await DialogService.ShowMessageBoxAsync(
+                $"Delete screenshot {position + 1} of {urls.Count}?",
+                $"{name} is removed from this trade and deleted from the Screenshots folder. This cannot be undone.",
+                yesText: "Delete", cancelText: "Cancel");
+
+            if (confirmed != true) return;
+
+            _saving = true;
+            try
+            {
+                var result = await ScreenshotService.DeleteAsync(tradeId, path);
+
+                // Only the trade that was on show is updated on screen (it is the one the screenshot belonged to).
+                if (CurrentBase is not null && CurrentBase.Id == tradeId)
+                {
+                    CurrentBase.ScreenshotsUrls = result.Urls;
+                    _screenshotIndex = Math.Max(0, Math.Min(position, result.Urls.Count - 1));
+                }
+
+                switch (result.File)
+                {
+                    case ScreenshotFileOutcome.Deleted:
+                        Snackbar.Add("Screenshot deleted.", Severity.Success);
+                        break;
+                    case ScreenshotFileOutcome.WasMissing:
+                        Snackbar.Add("Screenshot removed (its file was already gone).", Severity.Success);
+                        break;
+                    case ScreenshotFileOutcome.KeptBecauseShared:
+                        Snackbar.Add("Screenshot removed from this trade. Its file is kept because another trade uses it.", Severity.Info);
+                        break;
+                    case ScreenshotFileOutcome.NotInScreenshotsFolder:
+                        Snackbar.Add("Screenshot removed from this trade. Its file is outside the Screenshots folder, so it was not touched.", Severity.Warning);
+                        break;
+                    default:
+                        Snackbar.Add("Screenshot removed from this trade, but its file could not be deleted.", Severity.Warning);
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error while deleting the screenshot: {ex.Message}", Severity.Error);
             }
             finally
             {
