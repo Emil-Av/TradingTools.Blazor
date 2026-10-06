@@ -55,7 +55,6 @@ namespace TradingTools.Blazor.Tests.Spreads
         [Theory]
         [InlineData(EOutcome.Win, 50, 1.2, 48.8)]        // a win earns less
         [InlineData(EOutcome.Loss, 50, 1.2, -51.2)]      // a loss costs more
-        [InlineData(EOutcome.Breakeven, 0, 1.2, -1.2)]   // a breakeven costs the spread
         [InlineData(EOutcome.Win, 0.5, 1, -0.5)]         // a small win ends below zero
         public void The_main_position_loses_the_spread(EOutcome outcome, double pnl, double spread, double expected)
         {
@@ -117,11 +116,52 @@ namespace TradingTools.Blazor.Tests.Spreads
         }
 
         [Fact]
-        public void A_breakeven_costs_the_spread_in_euro()
+        public void A_breakeven_is_exactly_0_euro_the_spread_is_not_charged_on_it()
         {
             var result = TradeResults.Calculate(Trade(0, amount: 2), 1.2);
 
-            result.Euro.Should().BeApproximately(-2.4, 1e-9);
+            result.Euro.Should().Be(0);
+            result.Points.Should().Be(0);
+            result.SpreadEuro.Should().Be(0);
+        }
+
+        [Fact]
+        public void A_breakeven_is_0_even_without_a_recorded_amount()
+        {
+            var trade = Trade(0);
+            trade.Amount = null;
+
+            TradeResults.Calculate(trade, 1.2).Euro.Should().Be(0);
+        }
+
+        [Fact]
+        public void A_breakeven_with_add_ons_is_0_when_every_position_closed_at_its_entry()
+        {
+            var trade = Trade(0, EOutcome.Breakeven, 2, AddOn(1010, 1010, volume: 3));
+
+            var result = TradeResults.Calculate(trade, 1.2);
+            var net = TradeNet.Calculate(trade, 1.2)!;
+
+            result.Euro.Should().Be(0);
+            result.SpreadEuro.Should().Be(0);
+            net.NetEuro.Should().Be(0);
+            net.Outcome.Should().Be(EOutcome.Breakeven, "the outcome follows the net result, which is exactly 0");
+        }
+
+        [Fact]
+        public void One_position_not_at_its_entry_means_the_trade_is_not_a_breakeven_and_pays_the_spread()
+        {
+            var trade = Trade(0, EOutcome.Breakeven, 1, AddOn(1010, 1012, volume: 1));
+
+            TradeNet.Calculate(trade, 1)!.NetEuro.Should().BeApproximately(-1 + 1, 1e-9, "main -1, add-on +2 -1");
+            TradeResults.IsBreakeven(trade).Should().BeFalse();
+        }
+
+        [Fact]
+        public void A_trade_that_is_not_a_breakeven_still_pays_the_spread()
+        {
+            TradeResults.Calculate(Trade(5, amount: 2), 1.2).Euro.Should().BeApproximately(7.6, 1e-9);
+            TradeResults.Calculate(Trade(-5, amount: 2), 1.2).Euro.Should().BeApproximately(-12.4, 1e-9);
         }
 
         [Fact]
@@ -271,7 +311,7 @@ namespace TradingTools.Blazor.Tests.Spreads
         }
 
         [Fact]
-        public async Task A_breakeven_costs_the_spread_on_the_dashboard_but_stays_out_of_the_win_rate()
+        public async Task A_breakeven_is_0_on_the_dashboard_and_stays_out_of_the_win_rate()
         {
             var trades = await Load(TestSettings.WithSpreads(("DAX", 2)), Trade(0), Trade(10));
 
@@ -279,7 +319,15 @@ namespace TradingTools.Blazor.Tests.Spreads
 
             summary.Breakevens.Should().Be(1);
             summary.WinRate.Should().Be(1, "breakevens are still not counted for or against the win rate");
-            summary.NetEuro.Should().Be(6, "-2 for the breakeven, +8 for the win");
+            summary.NetEuro.Should().Be(8, "0 for the breakeven, +8 for the win");
+        }
+
+        [Fact]
+        public async Task A_breakeven_with_add_ons_is_0_on_the_dashboard_too()
+        {
+            var trades = await Load(TestSettings.WithSpreads(("DAX", 2)), Trade(0, EOutcome.Breakeven, 1, AddOn(1010, 1010, volume: 3)));
+
+            DashboardStats.Summarize(trades).NetEuro.Should().Be(0);
         }
 
         [Fact]

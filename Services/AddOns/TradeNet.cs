@@ -63,7 +63,8 @@ namespace TradingTools.Blazor.Services.AddOns
         /// <summary>
         /// The net result of the trade, or null when a part of it is unknown (a missing price, amount or
         /// volume) - a partly filled in trade has no result yet. <paramref name="spread"/> is the instrument's
-        /// spread in points, taken off every position (the main one and each add-on) before its volume is applied.
+        /// spread in points, taken off every position (the main one and each add-on) before its volume is applied -
+        /// except on a breakeven (every position closed at its entry), which is exactly 0.
         /// </summary>
         public static TradeNetResult? Calculate(BaseTrade trade, double spread = 0) =>
             Calculate(trade.Direction, trade.EntryPrice, trade.ExitPrice, trade.Amount, trade.AddOns, spread);
@@ -72,8 +73,12 @@ namespace TradingTools.Blazor.Services.AddOns
         {
             if (amount is not > 0 || SignedPoints(entryPrice, exitPrice, direction) is not { } mainPoints) return null;
 
+            // A breakeven - every position closed exactly at its entry - is exactly 0: the spread isn't charged on it.
+            var positions = addOns as IList<TradeAddOn> ?? [.. addOns];
+            if (mainPoints == 0 && positions.All(a => SignedPoints(a.EntryPrice, a.ExitPrice, direction) == 0)) spread = 0;
+
             double addOnsEuro = 0, totalVolume = amount.Value;
-            foreach (var addOn in addOns)
+            foreach (var addOn in positions)
             {
                 if (addOn.Volume is not > 0 || SignedPoints(addOn.EntryPrice, addOn.ExitPrice, direction) is not { } points) return null;
                 addOnsEuro += (points - spread) * addOn.Volume.Value;

@@ -12,7 +12,8 @@ namespace TradingTools.Blazor.Services.Calculation
     ///
     /// The spread is what opening a position costs, in points, so it's taken off every position of the trade -
     /// the main position and each add-on - and then multiplied by that position's volume like the rest of its
-    /// result. A breakeven therefore costs the spread too, and a small win can end up below zero.
+    /// result, so a small win can end up below zero. A breakeven trade is the exception: it is exactly 0, the
+    /// spread is not charged on it (see <see cref="IsBreakeven"/>).
     /// </summary>
     public static class TradeResults
     {
@@ -53,9 +54,28 @@ namespace TradingTools.Blazor.Services.Calculation
             return sign * magnitude;
         }
 
+        /// <summary>
+        /// Whether the trade is a breakeven, which costs nothing: without add-ons its Outcome is Breakeven; with
+        /// add-ons (whose Outcome is the net result) every position closed exactly at its entry price.
+        /// </summary>
+        public static bool IsBreakeven(BaseTrade trade)
+        {
+            if (trade.AddOns.Count == 0) return trade.Outcome == EOutcome.Breakeven;
+
+            return TradeNet.ResultSign(trade.EntryPrice, trade.ExitPrice, trade.Direction) == 0
+                && trade.AddOns.All(a => TradeAddOns.SignedPoints(a, trade.Direction) == 0);
+        }
+
+        /// <summary>The spread that is charged on the trade: none on a breakeven.</summary>
+        public static double ChargedSpread(BaseTrade trade, double spread) => IsBreakeven(trade) ? 0 : spread;
+
         /// <summary>The main position's result in points after the spread; null when the points aren't known.</summary>
         public static double? MainPointsAfterSpread(BaseTrade trade, double spread) =>
-            AfterSpread(MainPoints(trade), spread);
+            AfterSpread(MainPoints(trade), ChargedSpread(trade, spread));
+
+        /// <summary>An add-on's result in points after the spread of the trade it belongs to (none on a breakeven trade).</summary>
+        public static double? AddOnPointsAfterSpread(BaseTrade trade, TradeAddOn addOn, double spread) =>
+            AddOnPointsAfterSpread(addOn, trade.Direction, ChargedSpread(trade, spread));
 
         /// <summary>An add-on's result in points after the spread: signed from its prices and the trade's direction.</summary>
         public static double? AddOnPointsAfterSpread(TradeAddOn addOn, EDirection direction, double spread) =>
@@ -79,6 +99,7 @@ namespace TradingTools.Blazor.Services.Calculation
         /// <summary>The whole trade - main position and add-ons - with the spread taken off; null parts mean not known.</summary>
         public static TradeResultSummary Calculate(BaseTrade trade, double spread)
         {
+            spread = ChargedSpread(trade, spread);
             double? mainPoints = MainPointsAfterSpread(trade, spread);
             var addOns = trade.AddOns
                 .Select(a => (Points: AddOnPointsAfterSpread(a, trade.Direction, spread), a.Volume))

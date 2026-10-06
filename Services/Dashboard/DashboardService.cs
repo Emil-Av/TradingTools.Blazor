@@ -53,7 +53,7 @@ namespace TradingTools.Blazor.Services.Dashboard
                 {
                     AddOns = [.. t.AddOns
                         .OrderBy(a => a.Id)
-                        .Select(a => new DashboardAddOn(TradeResults.AddOnPointsAfterSpread(a, t.Direction, spreads.For(t.Symbol)), a.Volume))]
+                        .Select(a => new DashboardAddOn(TradeResults.AddOnPointsAfterSpread(t, a, spreads.For(t.Symbol)), a.Volume))]
                 })];
         }
 
