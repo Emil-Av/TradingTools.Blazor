@@ -1121,3 +1121,15 @@ h1:focus {
     border-radius: 999px;
     background: var(--app-error);
 }
+.app-nav-dot.ok {
+    background: #4fc783;
+}
+.app-nav-menu-allset {
+    padding: 8px 10px 10px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--app-border);
+    color: #4fc783;
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+}

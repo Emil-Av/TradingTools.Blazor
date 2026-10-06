@@ -10,6 +10,7 @@ using TradingTools.Blazor.Services;
 using TradingTools.Blazor.Services.AddOns;
 using TradingTools.Blazor.Services.Interfaces;
 using TradingTools.Blazor.Services.Reviews;
+using TradingTools.Blazor.Services.Screenshots;
 using TradingTools.Blazor.Services.Settings;
 using TradingTools.Blazor.Services.Validation;
 
@@ -124,6 +125,11 @@ namespace TradingTools.Blazor.Components.Pages
             {
                 _uploadedFiles.Add(file);
             }
+
+            // Shown, uploaded and saved by date, the oldest first - however they were picked or in what order.
+            var sorted = ScreenshotOrder.OldestFirst(_uploadedFiles);
+            _uploadedFiles.Clear();
+            _uploadedFiles.AddRange(sorted);
         }
 
         private void RemoveFile(IBrowserFile file) => _uploadedFiles.Remove(file);

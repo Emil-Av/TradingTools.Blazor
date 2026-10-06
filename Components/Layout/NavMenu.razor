@@ -24,12 +24,20 @@
         <details class="app-nav-menu">
             <summary class="app-nav-item">
                 Data check
-                @if (_invalidTrades > 0 || _reviewsDue > 0)
+                @if (_allSet)
+                {
+                    <span class="app-nav-dot ok" title="All set"></span>
+                }
+                else if (_needsAttention)
                 {
                     <span class="app-nav-dot" title="Something needs attention"></span>
                 }
             </summary>
             <div class="app-nav-menu-panel">
+                @if (_allSet)
+                {
+                    <div class="app-nav-menu-allset">All set, Mr. Discipline.</div>
+                }
                 <NavLink class="app-nav-menu-item" href="validation">
                     Trade validation
                     @if (_invalidTrades > 0)
@@ -76,6 +84,9 @@
 @code {
     private int _reviewsDue;
     private int _invalidTrades => ValidationMonitor.LatestReport?.InvalidTrades.Count ?? 0;
+    // Only "all set" once the validation has actually run (right after the app starts there is no report yet).
+    private bool _allSet => ValidationMonitor.LatestReport is not null && _invalidTrades == 0 && _reviewsDue == 0;
+    private bool _needsAttention => _invalidTrades > 0 || _reviewsDue > 0;
 
     protected override async Task OnInitializedAsync()
     {
