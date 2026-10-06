@@ -217,13 +217,6 @@ namespace TradingTools.Blazor.Components.Pages
             else _openReviews.Remove(kind);
         }
 
-        /// <summary>The banner's button: to the Review tab, with the first review to do open.</summary>
-        private void ShowReviewTab()
-        {
-            _activeTab = ReviewTab;
-            if (_dueReview is { Reviews.Count: > 0 } due) OpenReview(due.Reviews[0]);
-        }
-
         #endregion
 
         protected override async Task OnInitializedAsync()

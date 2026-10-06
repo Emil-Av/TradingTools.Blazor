@@ -115,22 +115,6 @@ else
                     </ul>
                 </MudAlert>
             }
-            @* A review is ready for this sample size: it is due until it has text. *@
-            @if (_dueReview is { Reviews.Count: > 0 } dueReview)
-            {
-                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mb-3">
-                    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-                        <span>
-                            <strong>@(dueReview.Reviews.Count == 1 ? "A review is" : $"{dueReview.Reviews.Count} reviews are") ready for this sample size:</strong>
-                            @string.Join(", ", dueReview.Reviews.Select(kind => $"{ReviewSchedule.Label(kind).ToLowerInvariant()} ({ReviewSchedule.Covers(kind)})")).
-                        </span>
-                        @if (_activeTab != ReviewTab)
-                        {
-                            <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Info" StartIcon="@Icons.Material.Filled.RateReview" OnClick="ShowReviewTab">Open review</MudButton>
-                        }
-                    </div>
-                </MudAlert>
-            }
             <MudTabs @bind-ActivePanelIndex="_activeTab" Rounded="true" ApplyEffectsToContainer="true" TabPanelsClass="pa-4">
                 <MudTabPanel Text="Trade Data">
                     <MudText Typo="Typo.overline" Class="mb-2" Style="color:var(--app-text-secondary);">Basic info</MudText>
@@ -328,7 +312,8 @@ else
                     }
                 </MudTabPanel>
 
-                <MudTabPanel Text="Review">
+                @* A blue dot while a review of this sample size is due (it stays due until it has text). *@
+                <MudTabPanel Text="Review" BadgeDot="@(_dueReview is { Reviews.Count: > 0 })" BadgeColor="Color.Info" ToolTip="@(_dueReview is { Reviews.Count: > 0 } ? "A review is ready" : null)">
                     @if (_vm.CurrentSampleSize.Review is { } review)
                     {
                         <MudExpansionPanels MultiExpansion="true" Elevation="0" Class="app-expansion">
