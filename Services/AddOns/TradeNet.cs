@@ -53,6 +53,16 @@ namespace TradingTools.Blazor.Services.AddOns
                 _ => null
             };
 
+        /// <summary>
+        /// The outcome a trade has, worked out and never typed in: from its entry price, exit price and direction,
+        /// like an add-on's; with add-ons it is the net result of the whole trade (spread included). Null while
+        /// something it needs is missing.
+        /// </summary>
+        public static EOutcome? DeterminedOutcome(BaseTrade trade, double spread = 0) =>
+            trade.AddOns.Count > 0
+                ? Calculate(trade, spread)?.Outcome
+                : OutcomeOf(trade.EntryPrice, trade.ExitPrice, trade.Direction);
+
         /// <summary>A position's result in points, signed from its prices and the direction; null when they don't say.</summary>
         public static double? SignedPoints(double? entryPrice, double? exitPrice, EDirection direction)
         {

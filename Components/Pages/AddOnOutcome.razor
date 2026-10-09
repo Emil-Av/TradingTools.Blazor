@@ -5,9 +5,12 @@
    until both prices are filled in. *@
 <MudTextField T="string" Value="@Text" ReadOnly="true" Label="Outcome" Variant="Variant.Outlined"
               Margin="@(Dense ? Margin.Dense : Margin.None)" Class="@($"app-addon-outcome {ToneClass}")"
-              UserAttributes="@(new Dictionary<string, object> { ["tabindex"] = -1, ["title"] = "Set automatically from the entry price, exit price and the trade's direction" })" />
+              UserAttributes="@(new Dictionary<string, object> { ["tabindex"] = -1, ["title"] = Hint ?? "Set automatically from the entry price, exit price and the trade's direction" })" />
 
 @code {
+    /// <summary>The tooltip, when the default (prices and direction) is not how it is worked out.</summary>
+    [Parameter] public string? Hint { get; set; }
+
     /// <summary>The add-on's outcome; null while a price is missing.</summary>
     [Parameter] public EOutcome? Outcome { get; set; }
 

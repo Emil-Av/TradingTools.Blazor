@@ -66,7 +66,9 @@ namespace TradingTools.Blazor.Components.Pages
                 : null;
             set
             {
-                if (CurrentBase is not null && value is not null) CurrentBase.Symbol = value.ToString();
+                if (CurrentBase is null || value is null) return;
+                CurrentBase.Symbol = value.ToString();
+                RecalculateOutcome(); // the spread depends on the symbol, and with add-ons it decides the outcome
             }
         }
 
@@ -129,14 +131,20 @@ namespace TradingTools.Blazor.Components.Pages
         private TradeNetResult? CurrentNet => CurrentBase is { AddOns.Count: > 0 } trade ? TradeNet.Calculate(trade, CurrentSpread) : null;
 
         /// <summary>
-        /// With add-ons the Outcome is the net result of the whole trade, so it follows the prices, amount,
-        /// direction and volumes as they're changed. It can still be changed by hand - the validation then says
-        /// if it disagrees with the net result.
+        /// The outcome of the trade on screen, worked out and never typed in (like an add-on's): from the entry price,
+        /// exit price and direction; with add-ons it is the net result of the whole trade. Null while something it
+        /// needs is missing.
+        /// </summary>
+        private EOutcome? DeterminedOutcome => CurrentBase is null ? null : TradeNet.DeterminedOutcome(CurrentBase, CurrentSpread);
+
+        /// <summary>
+        /// Sets the trade's Outcome to the determined one, as the prices, direction, amount, volumes and symbol are
+        /// changed. While it can't be determined yet the Outcome is left as it is.
         /// </summary>
         private void RecalculateOutcome()
         {
-            if (CurrentBase is not null && CurrentNet is { } net)
-                CurrentBase.Outcome = net.Outcome;
+            if (CurrentBase is not null && DeterminedOutcome is { } outcome)
+                CurrentBase.Outcome = outcome;
         }
 
         private void AddAddOn()
@@ -334,6 +342,7 @@ namespace TradingTools.Blazor.Components.Pages
                 switch (_activeTab)
                 {
                     case 0:
+                        RecalculateOutcome(); // a trade saved from here always carries its determined outcome
                         await TradesService.UpdateTradeDataAsync(CurrentBase);
                         break;
                     case 1:

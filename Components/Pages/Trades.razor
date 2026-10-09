@@ -142,13 +142,9 @@ else
                         <MudItem xs="12" sm="6" md="4"><MudNumericField Margin="Margin.Dense" T="double?" @bind-Value="CurrentBase.Amount" @bind-Value:after="RecalculateOutcome" Label="Amount" Variant="Variant.Outlined"
                                                                          Error="@(IssueFor(nameof(BaseTrade.Amount)) is not null)" ErrorText="@IssueFor(nameof(BaseTrade.Amount))" /></MudItem>
                         <MudItem xs="12" sm="6" md="4">
-                            <MudSelect Margin="Margin.Dense" T="EOutcome" @bind-Value="CurrentBase.Outcome" Label="Outcome" Variant="Variant.Outlined"
-                                       Error="@(IssueFor(nameof(BaseTrade.Outcome)) is not null)" ErrorText="@IssueFor(nameof(BaseTrade.Outcome))">
-                                @foreach (var o in Enum.GetValues<EOutcome>())
-                                {
-                                    <MudSelectItem Value="@o">@o</MudSelectItem>
-                                }
-                            </MudSelect>
+                            @* Read-only, like an add-on's: set from the prices and direction (the net result with add-ons). *@
+                            <AddOnOutcome Dense="true" Outcome="DeterminedOutcome"
+                                          Hint="@(CurrentBase.AddOns.Count > 0 ? "Set automatically from the net result of the main position and its add-ons" : null)" />
                         </MudItem>
                         <MudItem xs="12" sm="6" md="4">
                             <MudSelect Margin="Margin.Dense" T="ETradeRating" @bind-Value="CurrentBase.TradeRating" Label="Rating" Variant="Variant.Outlined">
