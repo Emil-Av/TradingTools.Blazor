@@ -59,9 +59,16 @@ namespace TradingTools.Blazor.Services.AddOns
         /// something it needs is missing.
         /// </summary>
         public static EOutcome? DeterminedOutcome(BaseTrade trade, double spread = 0) =>
-            trade.AddOns.Count > 0
-                ? Calculate(trade, spread)?.Outcome
-                : OutcomeOf(trade.EntryPrice, trade.ExitPrice, trade.Direction);
+            DeterminedOutcome(trade.Direction, trade.EntryPrice, trade.ExitPrice, trade.Amount, trade.AddOns, spread);
+
+        /// <summary>The same, from the values of a trade that is still being filled in.</summary>
+        public static EOutcome? DeterminedOutcome(EDirection direction, double? entryPrice, double? exitPrice, double? amount, IEnumerable<TradeAddOn> addOns, double spread = 0)
+        {
+            var positions = addOns as IList<TradeAddOn> ?? [.. addOns];
+            return positions.Count > 0
+                ? Calculate(direction, entryPrice, exitPrice, amount, positions, spread)?.Outcome
+                : OutcomeOf(entryPrice, exitPrice, direction);
+        }
 
         /// <summary>A position's result in points, signed from its prices and the direction; null when they don't say.</summary>
         public static double? SignedPoints(double? entryPrice, double? exitPrice, EDirection direction)

@@ -400,7 +400,8 @@ namespace TradingTools.Blazor.Components.Pages
             _saving = true;
             try
             {
-                var files = e.GetMultipleFiles(20);
+                // Uploaded, saved and shown by date, the oldest first - like on the New Trade page (they follow the screenshots already there).
+                var files = ScreenshotOrder.OldestFirst(e.GetMultipleFiles(20));
                 var formFiles = await Task.WhenAll(files.Select(f => BrowserFileFormFile.CreateAsync(f, MaxFileSizeBytes)));
                 var updatedUrls = await TradesService.UploadScreenshotsAsync(CurrentBase.Id, formFiles.Cast<Microsoft.AspNetCore.Http.IFormFile>().ToArray());
                 CurrentBase.ScreenshotsUrls = updatedUrls;

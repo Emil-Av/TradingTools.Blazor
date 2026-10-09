@@ -85,6 +85,21 @@ namespace TradingTools.Blazor.Tests.AddOns
         }
 
         [Fact]
+        public void A_trade_still_being_filled_in_gets_the_same_outcome_as_the_saved_trade_would()
+        {
+            var addOn = AddOn(1000, 1010);
+            var trade = Trade(EDirection.Long, 1000, 1050, EOutcome.Loss, 1, AddOn(1110, 1050));
+
+            TradeNet.DeterminedOutcome(EDirection.Long, 1000, 1010, null, []).Should().Be(EOutcome.Win);
+            TradeNet.DeterminedOutcome(EDirection.Short, 1000, 1010, null, []).Should().Be(EOutcome.Loss);
+            TradeNet.DeterminedOutcome(EDirection.Long, 1000, 1000, null, []).Should().Be(EOutcome.Breakeven);
+            TradeNet.DeterminedOutcome(EDirection.Long, 1000, null, null, []).Should().BeNull();
+            TradeNet.DeterminedOutcome(trade.Direction, trade.EntryPrice, trade.ExitPrice, trade.Amount, trade.AddOns)
+                .Should().Be(TradeNet.DeterminedOutcome(trade)).And.Be(EOutcome.Loss);
+            TradeNet.DeterminedOutcome(EDirection.Long, 1000, 1010, 1, [addOn], spread: 12).Should().Be(EOutcome.Loss);
+        }
+
+        [Fact]
         public void With_add_ons_a_breakeven_everywhere_is_a_breakeven_even_with_a_spread()
         {
             var trade = Trade(EDirection.Long, 1000, 1000, EOutcome.Loss, 2, AddOn(1010, 1010, volume: 3));

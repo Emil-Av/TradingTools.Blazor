@@ -74,7 +74,7 @@
                             <MudDatePicker Culture="AppCulture.DatePicker" Label="Date" @bind-Date="_dateAsDateTime" Variant="Variant.Outlined" />
                         </MudItem>
                         <MudItem xs="12" sm="6" md="4">
-                            <MudSelect T="ESymbol" @bind-Value="_symbol" Label="Symbol" Variant="Variant.Outlined">
+                            <MudSelect T="ESymbol" @bind-Value="_symbol" @bind-Value:after="OnSymbolChanged" Label="Symbol" Variant="Variant.Outlined">
                                 @foreach (var s in Enum.GetValues<ESymbol>())
                                 {
                                     <MudSelectItem Value="@s">@MyEnumConverter.SymbolFromEnum(s)</MudSelectItem>
@@ -91,12 +91,9 @@
                             <MudNumericField T="double?" @bind-Value="_amount" @bind-Value:after="RecalculateOutcome" Label="Amount" Variant="Variant.Outlined" />
                         </MudItem>
                         <MudItem xs="12" sm="6" md="4">
-                            <MudSelect T="EOutcome" @bind-Value="_outcome" Label="Outcome" Variant="Variant.Outlined">
-                                @foreach (var o in Enum.GetValues<EOutcome>())
-                                {
-                                    <MudSelectItem Value="@o">@o</MudSelectItem>
-                                }
-                            </MudSelect>
+                            @* Read-only, like an add-on's: set from the prices and direction (the net result with add-ons). *@
+                            <AddOnOutcome Outcome="DeterminedOutcome"
+                                          Hint="@(_addOns.Count > 0 ? "Set automatically from the net result of the main position and its add-ons" : null)" />
                         </MudItem>
                         <MudItem xs="12" sm="6" md="4">
                             <MudSelect T="ETradeRating" @bind-Value="_rating" Label="Rating" Variant="Variant.Outlined">

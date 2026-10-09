@@ -113,11 +113,20 @@ namespace TradingTools.Blazor.Components.Pages
         /// <summary>The whole trade's result in euro (main position + add-ons); null without add-ons or while something is missing.</summary>
         private TradeNetResult? Net => _addOns.Count > 0 ? TradeNet.Calculate(_direction, _entryPrice, _exitPrice, _amount, _addOns, _spreads.For(_symbol.ToString())) : null;
 
-        /// <summary>With add-ons the outcome is the net result of the whole trade (it can still be changed by hand).</summary>
+        /// <summary>
+        /// The outcome, worked out and never typed in (like an add-on's): from the prices and direction, or the net
+        /// result of the whole trade with add-ons. Null while something it needs is missing.
+        /// </summary>
+        private EOutcome? DeterminedOutcome =>
+            TradeNet.DeterminedOutcome(_direction, _entryPrice, _exitPrice, _amount, _addOns, _spreads.For(_symbol.ToString()));
+
+        /// <summary>Sets the outcome to the determined one; while it can't be determined yet it is left as it is.</summary>
         private void RecalculateOutcome()
         {
-            if (Net is { } net) _outcome = net.Outcome;
+            if (DeterminedOutcome is { } outcome) _outcome = outcome;
         }
+
+        private void OnSymbolChanged() => RecalculateOutcome(); // the spread decides the outcome of a trade with add-ons
 
         private void OnFilesSelected(InputFileChangeEventArgs e)
         {
@@ -199,6 +208,7 @@ namespace TradingTools.Blazor.Components.Pages
             _saving = true;
             try
             {
+                RecalculateOutcome();
                 var date = DateOnly.FromDateTime(_dateAsDateTime ?? DateTime.Now);
                 var vm = new NewTradeVM { SampleSizeViewData = _sizeData };
 
