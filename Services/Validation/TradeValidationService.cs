@@ -96,7 +96,8 @@ namespace TradingTools.Blazor.Services.Validation
                 account,
                 trades.Count - (skipped is null ? 0 : 1),
                 skipped?.Id,
-                invalid);
+                // In the order of the Trades page: by sample size (oldest first), then by trade within it.
+                [.. invalid.OrderBy(t => t.SampleSizeId).ThenBy(t => t.TradeNumber)]);
         }
     }
 }

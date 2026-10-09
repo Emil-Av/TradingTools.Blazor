@@ -142,13 +142,30 @@ namespace TradingTools.Blazor.Tests.Validation
         }
 
         [Fact]
-        public async Task Invalid_trades_are_listed_oldest_first()
+        public async Task Invalid_trades_are_listed_in_the_order_of_the_trades_page_by_trade_within_a_sample_size()
         {
             var ss = SampleSize(1);
 
+            // Dates are all over the place; the trades of a sample size are numbered by id.
             var report = await Run([ss], Invalid(5, ss, 12), Invalid(6, ss, 3), Invalid(7, ss, 8), Valid(8, ss, 30));
 
-            report.InvalidTrades.Select(t => t.TradeId).Should().Equal(6, 7, 5);
+            report.InvalidTrades.Select(t => t.TradeId).Should().Equal(5, 6, 7);
+            report.InvalidTrades.Select(t => t.TradeNumber).Should().Equal(1, 2, 3);
+        }
+
+        [Fact]
+        public async Task Invalid_trades_are_listed_by_sample_size_oldest_first_whatever_the_strategy_or_the_dates()
+        {
+            var first = SampleSize(1);
+            var second = SampleSize(2, Strategy.Espresso, TimeFrame.M5);
+            var third = SampleSize(3);
+
+            // Listed in a jumbled order and dated against the sample size order on purpose.
+            var report = await Run([first, second, third],
+                Invalid(30, third, 2), Invalid(20, second, 9), Invalid(11, first, 20), Invalid(10, first, 21), Valid(40, third, 29));
+
+            report.InvalidTrades.Select(t => t.SampleSizeId).Should().Equal(1, 1, 2, 3);
+            report.InvalidTrades.Select(t => t.TradeId).Should().Equal(10, 11, 20, 30);
         }
 
         [Fact]

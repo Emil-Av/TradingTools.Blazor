@@ -55,8 +55,8 @@
             </MudText>
 
             <div style="display:flex; flex-direction:column; gap:12px;">
-                @* Newest first: the trades you're most likely still working on. *@
-                @foreach (var trade in report.InvalidTrades.Reverse())
+                @* Oldest first: by sample size, then by trade (the order of the Trades page). *@
+                @foreach (var trade in report.InvalidTrades)
                 {
                     <div class="app-card app-invalid-trade">
                         <div class="app-invalid-trade-header">
