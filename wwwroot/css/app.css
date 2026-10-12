@@ -1138,3 +1138,17 @@ h1:focus {
     font-weight: 700;
     white-space: nowrap;
 }
+
+/* ---------- "Has text" signal (Trades: journal) ---------- */
+/* Green, not the blue of the Review tab's dot, which means a review is pending. */
+.app-tab-filled .mud-badge {
+    background-color: #4fc783 !important;
+    color: #4fc783 !important;
+}
+.app-filled-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: #4fc783;
+    flex: none;
+}

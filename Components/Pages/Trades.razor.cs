@@ -331,6 +331,26 @@ namespace TradingTools.Blazor.Components.Pages
             _loading = false;
         }
 
+        /// <summary>Whether any of the journal's four fields has text (the empty editor's markup doesn't count).</summary>
+        private bool JournalHasText => CurrentBase?.Journal is { } journal
+            && new[] { journal.Pre, journal.During, journal.Exit, journal.Post }.Any(ReviewSchedule.IsFilled);
+
+        /// <summary>A journal field's panel title: its name, with a green dot when it has text.</summary>
+        private static RenderFragment JournalTitle(string name, string? text) => builder =>
+        {
+            builder.OpenElement(0, "span");
+            builder.AddAttribute(1, "style", "display:inline-flex; align-items:center; gap:8px;");
+            builder.AddContent(2, name);
+            if (ReviewSchedule.IsFilled(text))
+            {
+                builder.OpenElement(3, "span");
+                builder.AddAttribute(4, "class", "app-filled-dot");
+                builder.AddAttribute(5, "title", "Has text");
+                builder.CloseElement();
+            }
+            builder.CloseElement();
+        };
+
         private string? Sanitize(string? html) => string.IsNullOrWhiteSpace(html) ? html : HtmlSanitizer.Sanitize(html);
 
         private async Task UpdateAsync()

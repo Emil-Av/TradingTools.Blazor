@@ -296,14 +296,28 @@ else
                     </MudGrid>
                 </MudTabPanel>
 
-                <MudTabPanel Text="Journal">
+                @* A green dot while the journal has text in any of its four fields (the blue dot of the Review tab means
+                   something else: a review is pending). *@
+                <MudTabPanel Text="Journal" BadgeDot="@JournalHasText" Class="app-tab-filled" ToolTip="@(JournalHasText ? "This trade has journal text" : null)">
                     @if (CurrentBase.Journal is { } journal)
                     {
                         <MudExpansionPanels MultiExpansion="true" Elevation="0" Class="app-expansion">
-                            <MudExpansionPanel Text="Pre"><RichTextEditor @bind-Value="journal.Pre" /></MudExpansionPanel>
-                            <MudExpansionPanel Text="During"><RichTextEditor @bind-Value="journal.During" /></MudExpansionPanel>
-                            <MudExpansionPanel Text="Exit"><RichTextEditor @bind-Value="journal.Exit" /></MudExpansionPanel>
-                            <MudExpansionPanel Text="Post"><RichTextEditor @bind-Value="journal.Post" /></MudExpansionPanel>
+                            <MudExpansionPanel>
+                                <TitleContent>@JournalTitle("Pre", journal.Pre)</TitleContent>
+                                <ChildContent><RichTextEditor @bind-Value="journal.Pre" /></ChildContent>
+                            </MudExpansionPanel>
+                            <MudExpansionPanel>
+                                <TitleContent>@JournalTitle("During", journal.During)</TitleContent>
+                                <ChildContent><RichTextEditor @bind-Value="journal.During" /></ChildContent>
+                            </MudExpansionPanel>
+                            <MudExpansionPanel>
+                                <TitleContent>@JournalTitle("Exit", journal.Exit)</TitleContent>
+                                <ChildContent><RichTextEditor @bind-Value="journal.Exit" /></ChildContent>
+                            </MudExpansionPanel>
+                            <MudExpansionPanel>
+                                <TitleContent>@JournalTitle("Post", journal.Post)</TitleContent>
+                                <ChildContent><RichTextEditor @bind-Value="journal.Post" /></ChildContent>
+                            </MudExpansionPanel>
                         </MudExpansionPanels>
                     }
                     else
