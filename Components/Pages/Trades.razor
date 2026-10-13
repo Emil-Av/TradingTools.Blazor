@@ -296,6 +296,8 @@ else
                     </MudGrid>
                 </MudTabPanel>
 
+                @* Each editor is keyed by its trade (and the review editors by their review): Radzen's editor keeps showing the
+                   previous content when the next value is empty, so without a key the text of one trade showed up in the next. *@
                 @* A green dot while the journal has text in any of its four fields (the blue dot of the Review tab means
                    something else: a review is pending). *@
                 <MudTabPanel Text="Journal" BadgeDot="@JournalHasText" Class="app-tab-filled" ToolTip="@(JournalHasText ? "This trade has journal text" : null)">
@@ -304,19 +306,19 @@ else
                         <MudExpansionPanels MultiExpansion="true" Elevation="0" Class="app-expansion">
                             <MudExpansionPanel>
                                 <TitleContent>@JournalTitle("Pre", journal.Pre)</TitleContent>
-                                <ChildContent><RichTextEditor @bind-Value="journal.Pre" /></ChildContent>
+                                <ChildContent><RichTextEditor @key="@($"pre-{CurrentBase.Id}")" @bind-Value="journal.Pre" /></ChildContent>
                             </MudExpansionPanel>
                             <MudExpansionPanel>
                                 <TitleContent>@JournalTitle("During", journal.During)</TitleContent>
-                                <ChildContent><RichTextEditor @bind-Value="journal.During" /></ChildContent>
+                                <ChildContent><RichTextEditor @key="@($"during-{CurrentBase.Id}")" @bind-Value="journal.During" /></ChildContent>
                             </MudExpansionPanel>
                             <MudExpansionPanel>
                                 <TitleContent>@JournalTitle("Exit", journal.Exit)</TitleContent>
-                                <ChildContent><RichTextEditor @bind-Value="journal.Exit" /></ChildContent>
+                                <ChildContent><RichTextEditor @key="@($"exit-{CurrentBase.Id}")" @bind-Value="journal.Exit" /></ChildContent>
                             </MudExpansionPanel>
                             <MudExpansionPanel>
                                 <TitleContent>@JournalTitle("Post", journal.Post)</TitleContent>
-                                <ChildContent><RichTextEditor @bind-Value="journal.Post" /></ChildContent>
+                                <ChildContent><RichTextEditor @key="@($"post-{CurrentBase.Id}")" @bind-Value="journal.Post" /></ChildContent>
                             </MudExpansionPanel>
                         </MudExpansionPanels>
                     }
@@ -347,7 +349,7 @@ else
                                         </div>
                                     </TitleContent>
                                     <ChildContent>
-                                        <RichTextEditor Value="@ReviewSchedule.TextOf(review, current)" ValueChanged="@(text => ReviewSchedule.SetText(review, current, text))" />
+                                        <RichTextEditor @key="@($"review-{review.Id}-{current}")" Value="@ReviewSchedule.TextOf(review, current)" ValueChanged="@(text => ReviewSchedule.SetText(review, current, text))" />
                                     </ChildContent>
                                 </MudExpansionPanel>
                             }
