@@ -1,0 +1,201 @@
+@page "/tom"
+@rendermode InteractiveServer
+@using Models.Tom
+@using TradingTools.Blazor.Services.Tom
+
+<MudProviders />
+
+<PageTitle>Tom</PageTitle>
+
+@* Reloading or closing the tab with unsaved notes asks first. *@
+<NavigationLock ConfirmExternalNavigation="@HasUnsavedChanges" />
+
+<div class="app-content">
+
+    <TopBar Title="Tom" Subtitle="The streams of Tom and Andi: the video, the trades they take in it and your notes on them.">
+        <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Add" OnClick="StartNewStream" Disabled="_busy">New stream</MudButton>
+    </TopBar>
+
+    @if (_creating)
+    {
+        <div class="app-card app-tom-new">
+            <MudText Typo="Typo.subtitle1" Style="font-weight:700;">New stream</MudText>
+            <div class="app-tom-fields">
+                <div class="app-tom-date">
+                    <MudDatePicker Culture="AppCulture.DatePicker" Margin="Margin.Dense" Label="Date" @bind-Date="_newDate" Variant="Variant.Outlined" />
+                </div>
+                <MudTextField T="string" Margin="Margin.Dense" Label="Video link" Placeholder="https://www.youtube.com/watch?v=..." @bind-Value="_newUrl" Immediate="true"
+                              Variant="Variant.Outlined" Error="@(!LinkIsValid(_newUrl))" ErrorText="A web link (https://...)" Class="app-tom-grow" />
+                <MudTextField T="string" Margin="Margin.Dense" Label="Title (optional)" Placeholder="e.g. DAX open" @bind-Value="_newTitle" Variant="Variant.Outlined" />
+            </div>
+            <div style="display:flex; gap:8px;">
+                <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="CreateStreamAsync" Disabled="@(_busy || !LinkIsValid(_newUrl))">Create</MudButton>
+                <MudButton Variant="Variant.Text" OnClick="() => _creating = false">Cancel</MudButton>
+            </div>
+        </div>
+    }
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Success" />
+    }
+    else if (_streams.Count == 0)
+    {
+        <div class="app-card" style="padding:48px; text-align:center;">
+            <MudText Typo="Typo.h6">No streams yet</MudText>
+            <MudText Typo="Typo.body2" Style="color:var(--app-text-secondary); margin-top:6px;">Add the first one with New stream: its date and the link to the video.</MudText>
+        </div>
+    }
+    else
+    {
+        <div class="app-tom">
+            @* The streams, grouped by month (newest first). *@
+            <nav class="app-card app-tom-list" aria-label="Streams">
+                @foreach (var month in TomMonths.Group(_streams))
+                {
+                    <div class="app-tom-month">@month.Label</div>
+                    @foreach (var listed in month.Streams)
+                    {
+                        var current = listed;
+                        <button type="button" class="app-tom-item @(current == _stream ? "active" : null)" @onclick="() => SelectStream(current)">
+                            <span class="app-tom-item-date">@current.Date.ToString("ddd dd MMM", System.Globalization.CultureInfo.InvariantCulture)</span>
+                            <span class="app-tom-item-title">@(current.Title ?? HostOf(current.Url) ?? "Stream")</span>
+                            <span class="app-tom-item-count">@current.Trades.Count @(current.Trades.Count == 1 ? "trade" : "trades")</span>
+                        </button>
+                    }
+                }
+            </nav>
+
+            @if (_stream is { } stream)
+            {
+                <div class="app-tom-detail">
+                    @* The stream: date, title, link. *@
+                    <div class="app-card app-tom-stream">
+                        <div class="app-tom-fields">
+                            <div class="app-tom-date">
+                                <MudDatePicker Culture="AppCulture.DatePicker" Margin="Margin.Dense" Label="Date" Variant="Variant.Outlined"
+                                               Date="@stream.Date.ToDateTime(TimeOnly.MinValue)" DateChanged="@(d => { if (d is { } day) stream.Date = DateOnly.FromDateTime(day); })" />
+                            </div>
+                            <MudTextField T="string" Margin="Margin.Dense" Label="Title" Placeholder="e.g. DAX open" @bind-Value="stream.Title" Variant="Variant.Outlined" />
+                            <MudTextField T="string" Margin="Margin.Dense" Label="Video link" Placeholder="https://www.youtube.com/watch?v=..." @bind-Value="stream.Url" Immediate="true"
+                                          Variant="Variant.Outlined" Error="@(!LinkIsValid(stream.Url))" ErrorText="A web link (https://...)" Class="app-tom-grow" />
+                            @if (TomLinks.At(stream.Url, null) is { } videoLink)
+                            {
+                                <a class="app-btn-primary app-tom-open" href="@videoLink" target="_blank" rel="noopener noreferrer">
+                                    <MudIcon Icon="@Icons.Material.Filled.OndemandVideo" Size="Size.Small" /> Open video
+                                </a>
+                            }
+                        </div>
+                    </div>
+
+                    @* The trades of the stream. *@
+                    <div class="app-card app-tom-trades">
+                        <div class="app-tom-trades-head">
+                            <div style="display:flex; flex-direction:column; gap:3px;">
+                                <span class="app-tom-label">TRADE</span>
+                                @if (stream.Trades.Count > 0)
+                                {
+                                    <div class="app-nav-counter">
+                                        <button @onclick="PrevTrade" disabled="@(_tradeIndex <= 0)" aria-label="Previous trade"><MudIcon Icon="@Icons.Material.Filled.ChevronLeft" Size="Size.Small" /></button>
+                                        <span class="app-nav-counter-value">@(_tradeIndex + 1) / @stream.Trades.Count</span>
+                                        <button @onclick="NextTrade" disabled="@(_tradeIndex >= stream.Trades.Count - 1)" aria-label="Next trade"><MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" /></button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span style="font-size:13px; color:var(--app-text-secondary);">None yet</span>
+                                }
+                            </div>
+                            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                                @* Add trade asks for the trade's screenshots right away: a trade starts with its chart. *@
+                                <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Add" Disabled="_busy" OnClick="@(() => PickFiles(NewTradeInput))">Add trade</MudButton>
+                                <InputFile id="@NewTradeInput" OnChange="OnNewTradeFilesAsync" multiple accept="image/*" style="display:none;" />
+                                @if (CurrentTrade is not null)
+                                {
+                                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Upload" Disabled="_busy" OnClick="@(() => PickFiles(MoreScreenshotsInput))">Add screenshots</MudButton>
+                                    <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete" Disabled="_busy" OnClick="ConfirmDeleteTradeAsync">Delete trade</MudButton>
+                                }
+                                <InputFile id="@MoreScreenshotsInput" OnChange="OnMoreScreenshotsAsync" multiple accept="image/*" style="display:none;" />
+                            </div>
+                        </div>
+
+                        @if (CurrentTrade is { } trade)
+                        {
+                            @if (trade.ScreenshotsUrls is { Count: > 0 } urls)
+                            {
+                                @* Same carousel as the Trades page (styles in app.css, full screen in fullscreen.js). *@
+                                <div class="app-carousel" data-fullscreen>
+                                    <img class="app-carousel-img" src="@("/" + urls[_screenshotIndex])" alt="Screenshot @(_screenshotIndex + 1) of @urls.Count" />
+                                    <button type="button" class="app-carousel-btn app-carousel-fs" onclick="appFullscreen.toggle(this)" title="Full screen (Esc to close)" aria-label="Toggle full screen">
+                                        <svg class="app-fs-enter" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+                                        <svg class="app-fs-exit" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /></svg>
+                                    </button>
+                                    <button type="button" class="app-carousel-btn app-carousel-del" title="Delete this screenshot" aria-label="Delete this screenshot" disabled="@_busy" @onclick="ConfirmDeleteScreenshotAsync">
+                                        <MudIcon Icon="@Icons.Material.Filled.DeleteOutline" Size="Size.Small" />
+                                    </button>
+                                    @if (urls.Count > 1)
+                                    {
+                                        <button class="app-carousel-btn" style="left:14px;" data-fullscreen-prev aria-label="Previous screenshot" @onclick="PrevScreenshot"><MudIcon Icon="@Icons.Material.Filled.ChevronLeft" /></button>
+                                        <button class="app-carousel-btn" style="right:14px;" data-fullscreen-next aria-label="Next screenshot" @onclick="NextScreenshot"><MudIcon Icon="@Icons.Material.Filled.ChevronRight" /></button>
+                                        <div style="position:absolute; bottom:10px; left:0; right:0; text-align:center; color:white; font-size:11px; text-shadow:0 1px 2px black;">@(_screenshotIndex + 1) / @urls.Count</div>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="app-tom-empty">No screenshots for this trade - add them with Add screenshots.</div>
+                            }
+
+                            @* Where the trade is in the video: a link straight to that moment. *@
+                            <div class="app-tom-fields">
+                                <div class="app-tom-time">
+                                    <MudTextField T="string" Margin="Margin.Dense" Label="Time in video" Placeholder="h:mm:ss" Value="@TimeText" ValueChanged="OnTimeChanged"
+                                                  Variant="Variant.Outlined" Error="@(_timeError is not null)" ErrorText="@_timeError" />
+                                </div>
+                                @if (TomLinks.At(stream.Url, trade.VideoSeconds) is { } momentLink && trade.VideoSeconds is { } seconds)
+                                {
+                                    <a class="app-tom-watch" href="@momentLink" target="_blank" rel="noopener noreferrer">
+                                        <MudIcon Icon="@Icons.Material.Filled.PlayCircleOutline" Size="Size.Small" /> Watch from @VideoTime.Format(seconds)
+                                    </a>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="app-tom-empty">No trades in this stream yet - Add trade picks the screenshots of the first one.</div>
+                        }
+                    </div>
+
+                    @* Two notes side by side: the trade's own, and the stream's, which stay as you go through the trades.
+                       Each editor is keyed by what it belongs to, so switching never shows the previous text. *@
+                    <div class="app-tom-notes">
+                        <div class="app-card app-tom-note">
+                            <div class="app-tom-label">THIS TRADE</div>
+                            @if (CurrentTrade is { } noteTrade)
+                            {
+                                <RichTextEditor @key="@($"tom-trade-{noteTrade.Id}")" @bind-Value="noteTrade.Notes" Height="240" />
+                            }
+                            else
+                            {
+                                <div class="app-tom-empty">Add a trade to write about it.</div>
+                            }
+                        </div>
+                        <div class="app-card app-tom-note">
+                            <div class="app-tom-label">STREAM NOTES</div>
+                            <RichTextEditor @key="@($"tom-stream-{stream.Id}")" @bind-Value="stream.Notes" Height="240" />
+                        </div>
+                    </div>
+
+                    <div class="app-tom-actions">
+                        <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Save" OnClick="SaveAsync" Disabled="@(_busy || !HasUnsavedChanges)">Save</MudButton>
+                        @if (HasUnsavedChanges)
+                        {
+                            <span class="app-chip app-chip-neutral">Unsaved changes</span>
+                        }
+                        <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete" OnClick="ConfirmDeleteStreamAsync" Disabled="_busy" Style="margin-left:auto;">Delete stream</MudButton>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>

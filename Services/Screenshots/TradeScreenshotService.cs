@@ -61,19 +61,12 @@ namespace TradingTools.Blazor.Services.Screenshots
             int index = urls.FindIndex(url => string.Equals(url, path, StringComparison.Ordinal));
             if (index < 0) throw new InvalidOperationException("This screenshot is no longer part of the trade.");
 
-            string key = Key(path);
-            string? file = ResolveFile(_environment.WebRootPath, path);
+            string key = ScreenshotFiles.Key(path);
+            string? file = ScreenshotFiles.ResolveFile(_environment.WebRootPath, path);
 
             // Does anything else still point at this file? Another position in this trade, or any other trade.
-            bool shared = urls.Where((_, i) => i != index).Any(url => SameFile(url, key));
-            if (!shared)
-            {
-                var others = await _db.Set<BaseTrade>().AsNoTracking()
-                    .Where(t => t.Id != tradeId && t.ScreenshotsUrls != null)
-                    .Select(t => t.ScreenshotsUrls!)
-                    .ToListAsync(cancellationToken);
-                shared = others.Any(list => list.Any(url => SameFile(url, key)));
-            }
+            bool shared = urls.Where((_, i) => i != index).Any(url => ScreenshotFiles.SameFile(url, key))
+                || await ScreenshotFiles.IsUsedElsewhereAsync(_db, path, exceptTradeId: tradeId, cancellationToken: cancellationToken);
 
             // 1. The database first: if this fails nothing has been touched.
             var remaining = urls.Where((_, i) => i != index).ToList();
@@ -81,49 +74,9 @@ namespace TradingTools.Blazor.Services.Screenshots
             await _db.SaveChangesAsync(cancellationToken);
 
             // 2. Then the file.
-            return new ScreenshotDeleteResult(remaining, DeleteFile(file, shared));
+            return new ScreenshotDeleteResult(remaining, ScreenshotFiles.Delete(file, shared, _logger));
         }
 
-        private ScreenshotFileOutcome DeleteFile(string? file, bool shared)
-        {
-            if (file is null) return ScreenshotFileOutcome.NotInScreenshotsFolder;
-            if (shared) return ScreenshotFileOutcome.KeptBecauseShared;
-            if (!File.Exists(file)) return ScreenshotFileOutcome.WasMissing;
-
-            try
-            {
-                File.Delete(file);
-                return ScreenshotFileOutcome.Deleted;
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                _logger.LogWarning(ex, "The screenshot's path was removed but its file could not be deleted: {File}", file);
-                return ScreenshotFileOutcome.Failed;
-            }
-        }
-
-        /// <summary>A path as a comparable key: forward slashes, no leading slash (older research paths have both forms).</summary>
-        internal static string Key(string path) => path.Trim().Replace('\\', '/').TrimStart('/');
-
-        // Case-insensitive on purpose: when in doubt the file is kept.
-        private static bool SameFile(string path, string key) =>
-            string.Equals(Key(path), key, StringComparison.OrdinalIgnoreCase);
-
-        /// <summary>
-        /// The full path of the file a database path points at, or null when it doesn't lead to a file strictly
-        /// inside the Screenshots folder (an empty path, a rooted one, one with "." or ".." in it).
-        /// </summary>
-        internal static string? ResolveFile(string webRootPath, string path)
-        {
-            string relative = Key(path);
-            if (relative.Length == 0 || relative.Split('/').Any(part => part is "." or "..")) return null;
-
-            char separator = Path.DirectorySeparatorChar;
-            string root = Path.GetFullPath(ScreenshotStorage.GetRoot(webRootPath)).TrimEnd(separator, Path.AltDirectorySeparatorChar) + separator;
-            string full = Path.GetFullPath(Path.Combine(webRootPath, relative.Replace('/', separator)));
-
-            var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-            return full.StartsWith(root, comparison) && full.Length > root.Length ? full : null;
-        }
+        internal static string? ResolveFile(string webRootPath, string path) => ScreenshotFiles.ResolveFile(webRootPath, path);
     }
 }

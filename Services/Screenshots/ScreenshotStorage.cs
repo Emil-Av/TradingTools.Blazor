@@ -74,10 +74,11 @@ namespace TradingTools.Blazor.Services.Screenshots
             foreach (var file in files)
             {
                 // The browser-supplied name can contain '/' or '\' whatever the server's OS; keep only
-                // the file name so nothing is written outside the folder.
-                string filePath = Path.Combine(folder, Path.GetFileName(file.FileName));
+                // the file name so nothing is written outside the folder. A file that is already there is never
+                // overwritten (two pasted screenshots are often both "image.png"): the new one gets a free name.
+                string filePath = FreePath(folder, Path.GetFileName(file.FileName));
 
-                await using (var stream = new FileStream(filePath, FileMode.Create))
+                await using (var stream = new FileStream(filePath, FileMode.CreateNew))
                 {
                     await file.CopyToAsync(stream);
                 }
@@ -86,6 +87,16 @@ namespace TradingTools.Blazor.Services.Screenshots
             }
 
             return paths;
+        }
+
+        /// <summary>"name.png", or "name (2).png", "name (3).png", ... when that name is taken in the folder.</summary>
+        internal static string FreePath(string folder, string fileName)
+        {
+            string path = Path.Combine(folder, fileName);
+            string name = Path.GetFileNameWithoutExtension(fileName), extension = Path.GetExtension(fileName);
+            for (int n = 2; File.Exists(path); n++)
+                path = Path.Combine(folder, $"{name} ({n}){extension}");
+            return path;
         }
 
         /// <summary>A file path under wwwroot as stored in the database: relative, forward slashes.</summary>
