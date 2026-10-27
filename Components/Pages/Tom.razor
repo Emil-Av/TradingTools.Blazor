@@ -26,7 +26,18 @@
                 </div>
                 <MudTextField T="string" Margin="Margin.Dense" Label="Video link" Placeholder="https://www.youtube.com/watch?v=..." @bind-Value="_newUrl" Immediate="true"
                               Variant="Variant.Outlined" Error="@(!LinkIsValid(_newUrl))" ErrorText="A web link (https://...)" Class="app-tom-grow" />
-                <MudTextField T="string" Margin="Margin.Dense" Label="Title (optional)" Placeholder="e.g. DAX open" @bind-Value="_newTitle" Variant="Variant.Outlined" />
+                <div class="app-tom-choice">
+                    <MudSelect T="TomSession" Margin="Margin.Dense" Label="Session" @bind-Value="_newSession" Variant="Variant.Outlined">
+                        <MudSelectItem Value="TomSession.EU">EU</MudSelectItem>
+                        <MudSelectItem Value="TomSession.US">US</MudSelectItem>
+                    </MudSelect>
+                </div>
+                <div class="app-tom-choice">
+                    <MudSelect T="TomTrader" Margin="Margin.Dense" Label="Trader" @bind-Value="_newTrader" Variant="Variant.Outlined">
+                        <MudSelectItem Value="TomTrader.Tom">Tom</MudSelectItem>
+                        <MudSelectItem Value="TomTrader.Andi">Andi</MudSelectItem>
+                    </MudSelect>
+                </div>
             </div>
             <div style="display:flex; gap:8px;">
                 <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="CreateStreamAsync" Disabled="@(_busy || !LinkIsValid(_newUrl))">Create</MudButton>
@@ -48,10 +59,54 @@
     }
     else
     {
+        @* Which streams the list shows: all filters apply together. *@
+        <div class="app-card app-tom-filters">
+            <div class="app-tom-choice">
+                <MudSelect T="DateOnly?" Margin="Margin.Dense" Label="Month" Value="_filter.Month" ValueChanged="@(m => SetFilter(_filter with { Month = m }))" Variant="Variant.Outlined">
+                    <MudSelectItem T="DateOnly?" Value="@((DateOnly?)null)">All months</MudSelectItem>
+                    @foreach (var m in TomFilter.MonthsOf(_streams))
+                    {
+                        <MudSelectItem T="DateOnly?" Value="@((DateOnly?)m)">@m.ToString("MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture)</MudSelectItem>
+                    }
+                </MudSelect>
+            </div>
+            <div class="app-tom-date">
+                <MudDatePicker Culture="AppCulture.DatePicker" Margin="Margin.Dense" Label="From" Variant="Variant.Outlined" Clearable="true"
+                               Date="@_filter.From?.ToDateTime(TimeOnly.MinValue)" DateChanged="@(d => SetFilter(_filter with { From = d is { } day ? DateOnly.FromDateTime(day) : null }))" />
+            </div>
+            <div class="app-tom-date">
+                <MudDatePicker Culture="AppCulture.DatePicker" Margin="Margin.Dense" Label="To" Variant="Variant.Outlined" Clearable="true"
+                               Date="@_filter.To?.ToDateTime(TimeOnly.MinValue)" DateChanged="@(d => SetFilter(_filter with { To = d is { } day ? DateOnly.FromDateTime(day) : null }))" />
+            </div>
+            <div class="app-tom-choice">
+                <MudSelect T="TomSession?" Margin="Margin.Dense" Label="Session" Value="_filter.Session" ValueChanged="@(s => SetFilter(_filter with { Session = s }))" Variant="Variant.Outlined">
+                    <MudSelectItem T="TomSession?" Value="@((TomSession?)null)">All sessions</MudSelectItem>
+                    <MudSelectItem T="TomSession?" Value="@((TomSession?)TomSession.EU)">EU</MudSelectItem>
+                    <MudSelectItem T="TomSession?" Value="@((TomSession?)TomSession.US)">US</MudSelectItem>
+                </MudSelect>
+            </div>
+            <div class="app-tom-choice">
+                <MudSelect T="TomTrader?" Margin="Margin.Dense" Label="Trader" Value="_filter.Trader" ValueChanged="@(t => SetFilter(_filter with { Trader = t }))" Variant="Variant.Outlined">
+                    <MudSelectItem T="TomTrader?" Value="@((TomTrader?)null)">All traders</MudSelectItem>
+                    <MudSelectItem T="TomTrader?" Value="@((TomTrader?)TomTrader.Tom)">Tom</MudSelectItem>
+                    <MudSelectItem T="TomTrader?" Value="@((TomTrader?)TomTrader.Andi)">Andi</MudSelectItem>
+                </MudSelect>
+            </div>
+            <span class="app-tom-filter-count">@Shown.Count of @_streams.Count @(_streams.Count == 1 ? "stream" : "streams")</span>
+            @if (!_filter.IsEmpty)
+            {
+                <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Filled.FilterAltOff" OnClick="@(() => SetFilter(new TomFilter()))">Clear filters</MudButton>
+            }
+        </div>
+
         <div class="app-tom">
-            @* The streams, grouped by month (newest first). *@
+            @* The streams the filters let through, grouped by month (newest first). *@
             <nav class="app-card app-tom-list" aria-label="Streams">
-                @foreach (var month in TomMonths.Group(_streams))
+                @if (Shown.Count == 0)
+                {
+                    <div class="app-tom-empty">No streams match the filters.</div>
+                }
+                @foreach (var month in TomMonths.Group(Shown))
                 {
                     <div class="app-tom-month">@month.Label</div>
                     @foreach (var listed in month.Streams)
@@ -59,7 +114,7 @@
                         var current = listed;
                         <button type="button" class="app-tom-item @(current == _stream ? "active" : null)" @onclick="() => SelectStream(current)">
                             <span class="app-tom-item-date">@current.Date.ToString("ddd dd MMM", System.Globalization.CultureInfo.InvariantCulture)</span>
-                            <span class="app-tom-item-title">@(current.Title ?? HostOf(current.Url) ?? "Stream")</span>
+                            <span class="app-tom-item-title">@TomLabels.Of(current)</span>
                             <span class="app-tom-item-count">@current.Trades.Count @(current.Trades.Count == 1 ? "trade" : "trades")</span>
                         </button>
                     }
@@ -68,15 +123,29 @@
 
             @if (_stream is { } stream)
             {
-                <div class="app-tom-detail">
-                    @* The stream: date, title, link. *@
+                @* Keyed by the stream: switching streams builds fresh fields. Reused ones (the date picker, the selects)
+                   wrote the newly shown stream's values back into the stream shown before. *@
+                <div class="app-tom-detail" @key="stream.Id">
+                    @* The stream: date, session, trader, link. *@
                     <div class="app-card app-tom-stream">
                         <div class="app-tom-fields">
                             <div class="app-tom-date">
                                 <MudDatePicker Culture="AppCulture.DatePicker" Margin="Margin.Dense" Label="Date" Variant="Variant.Outlined"
                                                Date="@stream.Date.ToDateTime(TimeOnly.MinValue)" DateChanged="@(d => { if (d is { } day) stream.Date = DateOnly.FromDateTime(day); })" />
                             </div>
-                            <MudTextField T="string" Margin="Margin.Dense" Label="Title" Placeholder="e.g. DAX open" @bind-Value="stream.Title" Variant="Variant.Outlined" />
+                            @* Nullable: a stream added before sessions and traders were recorded has neither until one is chosen. *@
+                            <div class="app-tom-choice">
+                                <MudSelect T="TomSession?" Margin="Margin.Dense" Label="Session" @bind-Value="stream.Session" Variant="Variant.Outlined">
+                                    <MudSelectItem T="TomSession?" Value="@((TomSession?)TomSession.EU)">EU</MudSelectItem>
+                                    <MudSelectItem T="TomSession?" Value="@((TomSession?)TomSession.US)">US</MudSelectItem>
+                                </MudSelect>
+                            </div>
+                            <div class="app-tom-choice">
+                                <MudSelect T="TomTrader?" Margin="Margin.Dense" Label="Trader" @bind-Value="stream.Trader" Variant="Variant.Outlined">
+                                    <MudSelectItem T="TomTrader?" Value="@((TomTrader?)TomTrader.Tom)">Tom</MudSelectItem>
+                                    <MudSelectItem T="TomTrader?" Value="@((TomTrader?)TomTrader.Andi)">Andi</MudSelectItem>
+                                </MudSelect>
+                            </div>
                             <MudTextField T="string" Margin="Margin.Dense" Label="Video link" Placeholder="https://www.youtube.com/watch?v=..." @bind-Value="stream.Url" Immediate="true"
                                           Variant="Variant.Outlined" Error="@(!LinkIsValid(stream.Url))" ErrorText="A web link (https://...)" Class="app-tom-grow" />
                             @if (TomLinks.At(stream.Url, null) is { } videoLink)

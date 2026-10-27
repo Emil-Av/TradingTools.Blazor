@@ -11,12 +11,12 @@ namespace TradingTools.Blazor.Services.Tom
         /// <summary>Every stream with its trades (the trades in the order they were added).</summary>
         Task<List<TomStream>> GetStreamsAsync(CancellationToken cancellationToken = default);
 
-        Task<TomStream> CreateStreamAsync(DateOnly date, string? url, string? title, CancellationToken cancellationToken = default);
+        Task<TomStream> CreateStreamAsync(DateOnly date, string? url, TomSession session, TomTrader trader, CancellationToken cancellationToken = default);
 
         /// <summary>Whether something was changed on the page that isn't saved yet.</summary>
         bool HasUnsavedChanges { get; }
 
-        /// <summary>Saves every change made on the page (dates, links, titles, notes, times in the video).</summary>
+        /// <summary>Saves every change made on the page (dates, sessions, traders, links, notes, times in the video).</summary>
         /// <exception cref="ArgumentException">A video link isn't a web link (http or https).</exception>
         Task SaveAsync(CancellationToken cancellationToken = default);
 
@@ -57,12 +57,12 @@ namespace TradingTools.Blazor.Services.Tom
             return streams;
         }
 
-        public async Task<TomStream> CreateStreamAsync(DateOnly date, string? url, string? title, CancellationToken cancellationToken = default)
+        public async Task<TomStream> CreateStreamAsync(DateOnly date, string? url, TomSession session, TomTrader trader, CancellationToken cancellationToken = default)
         {
             if (!string.IsNullOrWhiteSpace(url) && !TomLinks.IsWebLink(url))
                 throw new ArgumentException("The video link has to be a web link (https://...).", nameof(url));
 
-            var stream = new TomStream { Date = date, Url = Clean(url), Title = Clean(title) };
+            var stream = new TomStream { Date = date, Url = Clean(url), Session = session, Trader = trader };
             _db.TomStreams.Add(stream);
             await SaveTrackedAsync(cancellationToken);
             return stream;

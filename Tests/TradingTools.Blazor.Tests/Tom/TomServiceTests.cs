@@ -45,25 +45,25 @@ namespace TradingTools.Blazor.Tests.Tom
         #region Streams
 
         [Fact]
-        public async Task A_stream_is_created_with_its_date_link_and_title()
+        public async Task A_stream_is_created_with_its_date_link_session_and_trader()
         {
-            var stream = await _service.CreateStreamAsync(Day, "  https://youtu.be/abc ", "  DAX open ");
+            var stream = await _service.CreateStreamAsync(Day, "  https://youtu.be/abc ", TomSession.US, TomTrader.Andi);
 
             var saved = await _db.TomStreams.AsNoTracking().SingleAsync();
             saved.Id.Should().Be(stream.Id);
             saved.Date.Should().Be(Day);
             saved.Url.Should().Be("https://youtu.be/abc");
-            saved.Title.Should().Be("DAX open");
+            saved.Session.Should().Be(TomSession.US);
+            saved.Trader.Should().Be(TomTrader.Andi);
         }
 
         [Fact]
-        public async Task A_stream_can_be_created_without_a_link_or_title()
+        public async Task A_stream_can_be_created_without_a_link()
         {
-            await _service.CreateStreamAsync(Day, " ", "");
+            await _service.CreateStreamAsync(Day, " ", TomSession.EU, TomTrader.Tom);
 
             var saved = await _db.TomStreams.AsNoTracking().SingleAsync();
             saved.Url.Should().BeNull();
-            saved.Title.Should().BeNull();
         }
 
         [Theory]
@@ -71,7 +71,7 @@ namespace TradingTools.Blazor.Tests.Tom
         [InlineData("youtube.com/watch?v=abc")]
         public async Task A_stream_with_a_link_that_is_not_a_web_link_is_refused(string url)
         {
-            var act = () => _service.CreateStreamAsync(Day, url, null);
+            var act = () => _service.CreateStreamAsync(Day, url, TomSession.EU, TomTrader.Tom);
 
             await act.Should().ThrowAsync<ArgumentException>();
             (await _db.TomStreams.CountAsync()).Should().Be(0);
@@ -80,11 +80,12 @@ namespace TradingTools.Blazor.Tests.Tom
         [Fact]
         public async Task Changes_made_on_the_page_are_saved_and_the_notes_are_sanitized()
         {
-            var stream = await _service.CreateStreamAsync(Day, "https://youtu.be/abc", null);
+            var stream = await _service.CreateStreamAsync(Day, "https://youtu.be/abc", TomSession.EU, TomTrader.Tom);
             var trade = await _service.AddTradeAsync(stream, []);
 
             stream.Notes = "<p>Bias long</p><script>alert(1)</script>";
-            stream.Title = " Morning ";
+            stream.Session = TomSession.US;
+            stream.Trader = TomTrader.Andi;
             trade.Notes = "<p onclick=\"x()\">Good entry</p>";
             trade.VideoSeconds = 5025;
             _service.HasUnsavedChanges.Should().BeTrue();
@@ -94,7 +95,8 @@ namespace TradingTools.Blazor.Tests.Tom
             _service.HasUnsavedChanges.Should().BeFalse();
             var saved = await _db.TomStreams.AsNoTracking().Include(s => s.Trades).SingleAsync();
             saved.Notes.Should().Be("<p>Bias long</p>");
-            saved.Title.Should().Be("Morning");
+            saved.Session.Should().Be(TomSession.US);
+            saved.Trader.Should().Be(TomTrader.Andi);
             saved.Trades.Single().Notes.Should().Be("<p>Good entry</p>");
             saved.Trades.Single().VideoSeconds.Should().Be(5025);
         }
@@ -102,7 +104,7 @@ namespace TradingTools.Blazor.Tests.Tom
         [Fact]
         public async Task A_changed_link_that_is_not_a_web_link_is_not_saved()
         {
-            var stream = await _service.CreateStreamAsync(Day, "https://youtu.be/abc", null);
+            var stream = await _service.CreateStreamAsync(Day, "https://youtu.be/abc", TomSession.EU, TomTrader.Tom);
             stream.Url = "javascript:alert(1)";
 
             var act = () => _service.SaveAsync();
@@ -114,7 +116,7 @@ namespace TradingTools.Blazor.Tests.Tom
         [Fact]
         public async Task The_streams_come_with_their_trades_in_the_order_they_were_added()
         {
-            var stream = await _service.CreateStreamAsync(Day, null, null);
+            var stream = await _service.CreateStreamAsync(Day, null, TomSession.EU, TomTrader.Tom);
             var first = await _service.AddTradeAsync(stream, []);
             var second = await _service.AddTradeAsync(stream, []);
 
@@ -130,7 +132,7 @@ namespace TradingTools.Blazor.Tests.Tom
         [Fact]
         public async Task A_new_trade_saves_its_screenshots_in_its_own_folder_in_the_order_given()
         {
-            var stream = await _service.CreateStreamAsync(Day, null, null);
+            var stream = await _service.CreateStreamAsync(Day, null, TomSession.EU, TomTrader.Tom);
 
             var trade = await _service.AddTradeAsync(stream, [Png("b.png"), Png("a.png")]);
 
@@ -143,7 +145,7 @@ namespace TradingTools.Blazor.Tests.Tom
         [Fact]
         public async Task More_screenshots_go_after_the_ones_a_trade_has()
         {
-            var stream = await _service.CreateStreamAsync(Day, null, null);
+            var stream = await _service.CreateStreamAsync(Day, null, TomSession.EU, TomTrader.Tom);
             var trade = await _service.AddTradeAsync(stream, [Png("a.png")]);
 
             await _service.AddScreenshotsAsync(stream, trade, [Png("b.png")]);
@@ -154,7 +156,7 @@ namespace TradingTools.Blazor.Tests.Tom
         [Fact]
         public async Task A_screenshot_with_a_name_already_in_the_folder_does_not_overwrite_it()
         {
-            var stream = await _service.CreateStreamAsync(Day, null, null);
+            var stream = await _service.CreateStreamAsync(Day, null, TomSession.EU, TomTrader.Tom);
             var trade = await _service.AddTradeAsync(stream, [Png("image.png", "first")]);
 
             await _service.AddScreenshotsAsync(stream, trade, [Png("image.png", "second")]);
@@ -167,7 +169,7 @@ namespace TradingTools.Blazor.Tests.Tom
         [Fact]
         public async Task Deleting_a_screenshot_removes_its_path_and_its_file_only()
         {
-            var stream = await _service.CreateStreamAsync(Day, null, null);
+            var stream = await _service.CreateStreamAsync(Day, null, TomSession.EU, TomTrader.Tom);
             var trade = await _service.AddTradeAsync(stream, [Png("a.png"), Png("b.png"), Png("c.png")]);
             string b = trade.ScreenshotsUrls![1];
 
@@ -181,7 +183,7 @@ namespace TradingTools.Blazor.Tests.Tom
         [Fact]
         public async Task A_screenshot_the_trade_does_not_have_changes_nothing()
         {
-            var stream = await _service.CreateStreamAsync(Day, null, null);
+            var stream = await _service.CreateStreamAsync(Day, null, TomSession.EU, TomTrader.Tom);
             var trade = await _service.AddTradeAsync(stream, [Png("a.png")]);
 
             var act = () => _service.DeleteScreenshotAsync(trade, "Screenshots/Tom/elsewhere.png");
@@ -193,7 +195,7 @@ namespace TradingTools.Blazor.Tests.Tom
         [Fact]
         public async Task A_file_a_trade_of_the_journal_also_uses_is_kept()
         {
-            var stream = await _service.CreateStreamAsync(Day, null, null);
+            var stream = await _service.CreateStreamAsync(Day, null, TomSession.EU, TomTrader.Tom);
             var trade = await _service.AddTradeAsync(stream, [Png("a.png")]);
             string path = trade.ScreenshotsUrls![0];
             _db.SampleSizes.Add(new SampleSize { Id = 1, SampleSizeType = SampleSizeType.DemoTrading, Strategy = Strategy.SRS, TimeFrame = TimeFrame.M15 });
@@ -209,7 +211,7 @@ namespace TradingTools.Blazor.Tests.Tom
         [Fact]
         public async Task Deleting_a_trade_deletes_its_files_and_leaves_the_other_trades_alone()
         {
-            var stream = await _service.CreateStreamAsync(Day, null, null);
+            var stream = await _service.CreateStreamAsync(Day, null, TomSession.EU, TomTrader.Tom);
             var keep = await _service.AddTradeAsync(stream, [Png("keep.png")]);
             var gone = await _service.AddTradeAsync(stream, [Png("gone1.png"), Png("gone2.png")]);
 
@@ -223,9 +225,9 @@ namespace TradingTools.Blazor.Tests.Tom
         [Fact]
         public async Task Deleting_a_stream_deletes_its_trades_and_their_files_but_not_other_streams()
         {
-            var other = await _service.CreateStreamAsync(Day.AddDays(-1), null, null);
+            var other = await _service.CreateStreamAsync(Day.AddDays(-1), null, TomSession.EU, TomTrader.Tom);
             await _service.AddTradeAsync(other, [Png("other.png")]);
-            var stream = await _service.CreateStreamAsync(Day, null, null);
+            var stream = await _service.CreateStreamAsync(Day, null, TomSession.EU, TomTrader.Tom);
             await _service.AddTradeAsync(stream, [Png("a.png")]);
             await _service.AddTradeAsync(stream, [Png("b.png")]);
 
@@ -239,7 +241,7 @@ namespace TradingTools.Blazor.Tests.Tom
         [Fact]
         public async Task Deleting_a_stream_never_deletes_a_file_a_trade_of_the_journal_uses()
         {
-            var stream = await _service.CreateStreamAsync(Day, null, null);
+            var stream = await _service.CreateStreamAsync(Day, null, TomSession.EU, TomTrader.Tom);
             var trade = await _service.AddTradeAsync(stream, [Png("a.png")]);
             string path = trade.ScreenshotsUrls![0];
             _db.SampleSizes.Add(new SampleSize { Id = 1, SampleSizeType = SampleSizeType.DemoTrading, Strategy = Strategy.SRS, TimeFrame = TimeFrame.M15 });
@@ -255,7 +257,7 @@ namespace TradingTools.Blazor.Tests.Tom
         public async Task Deleting_a_trade_of_the_journal_keeps_a_file_a_tom_trade_uses()
         {
             // The rule works both ways: the Trades page now also looks at the Tom trades.
-            var stream = await _service.CreateStreamAsync(Day, null, null);
+            var stream = await _service.CreateStreamAsync(Day, null, TomSession.EU, TomTrader.Tom);
             var tomTrade = await _service.AddTradeAsync(stream, [Png("a.png")]);
             string path = tomTrade.ScreenshotsUrls![0];
             _db.SampleSizes.Add(new SampleSize { Id = 1, SampleSizeType = SampleSizeType.DemoTrading, Strategy = Strategy.SRS, TimeFrame = TimeFrame.M15 });

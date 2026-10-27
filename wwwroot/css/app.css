@@ -1230,3 +1230,6 @@ h1:focus {
     .app-tom-list { position: static; max-height: 280px; }
     .app-tom-notes { grid-template-columns: minmax(0, 1fr); }
 }
+.app-tom-choice { flex: 0 0 150px !important; }
+.app-tom-filters { padding: 12px 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
+.app-tom-filter-count { font-size: 12px; color: var(--app-text-secondary); margin-left: auto; }

@@ -35,7 +35,14 @@ namespace TradingTools.Blazor.Components.Pages
         private bool _creating;
         private DateTime? _newDate;
         private string? _newUrl;
-        private string? _newTitle;
+        // A new stream starts as Tom's EU session, the most common one; both can be changed before creating it.
+        private TomSession _newSession = TomSession.EU;
+        private TomTrader _newTrader = TomTrader.Tom;
+
+        private TomFilter _filter = new();
+
+        /// <summary>The streams the filters let through.</summary>
+        private List<TomStream> Shown => [.. _filter.Apply(_streams)];
 
         // What was typed in "Time in video" while it isn't a valid time yet.
         private string? _timeDraft;
@@ -55,16 +62,14 @@ namespace TradingTools.Blazor.Components.Pages
 
         private static bool LinkIsValid(string? url) => string.IsNullOrWhiteSpace(url) || TomLinks.IsWebLink(url);
 
-        private static string? HostOf(string? url) =>
-            TomLinks.IsWebLink(url) ? new Uri(url!.Trim()).Host.Replace("www.", "") : null;
-
         #region Streams
 
         private void StartNewStream()
         {
             _newDate = DateTime.Today;
             _newUrl = null;
-            _newTitle = null;
+            _newSession = TomSession.EU;
+            _newTrader = TomTrader.Tom;
             _creating = true;
         }
 
@@ -72,12 +77,24 @@ namespace TradingTools.Blazor.Components.Pages
         {
             await RunAsync(async () =>
             {
-                var stream = await TomService.CreateStreamAsync(DateOnly.FromDateTime(_newDate ?? DateTime.Today), _newUrl, _newTitle);
+                var stream = await TomService.CreateStreamAsync(DateOnly.FromDateTime(_newDate ?? DateTime.Today), _newUrl, _newSession, _newTrader);
                 _streams.Add(stream);
                 _creating = false;
                 SelectStream(stream);
                 Snackbar.Add("Stream added. Add its trades with Add trade.", Severity.Success);
             }, "adding the stream");
+        }
+
+        /// <summary>
+        /// Applies new filters. When the stream on show isn't among the streams they let through, the newest one that is
+        /// opens instead (or none).
+        /// </summary>
+        private void SetFilter(TomFilter filter)
+        {
+            _filter = filter;
+            if (_stream is not null && _filter.Matches(_stream)) return;
+            _stream = TomMonths.Group(Shown).FirstOrDefault()?.Streams[0];
+            ShowTrade(0);
         }
 
         private void SelectStream(TomStream stream)

@@ -85,3 +85,45 @@ namespace TradingTools.Blazor.Services.Tom
                     [.. g.OrderByDescending(s => s.Date).ThenByDescending(s => s.Id)]))];
     }
 }
+
+namespace TradingTools.Blazor.Services.Tom
+{
+    /// <summary>
+    /// Which streams the list shows. Every part is optional and they all apply together: a month, a date range
+    /// (both ends included), a session and a trader. A stream without a session or trader (added before those were
+    /// recorded) only matches when that part isn't filtered.
+    /// </summary>
+    public sealed record TomFilter(
+        DateOnly? Month = null, DateOnly? From = null, DateOnly? To = null, TomSession? Session = null, TomTrader? Trader = null)
+    {
+        public bool IsEmpty => Month is null && From is null && To is null && Session is null && Trader is null;
+
+        public bool Matches(TomStream stream) =>
+            (Month is not { } month || (stream.Date.Year == month.Year && stream.Date.Month == month.Month))
+            && (From is not { } from || stream.Date >= from)
+            && (To is not { } to || stream.Date <= to)
+            && (Session is not { } session || stream.Session == session)
+            && (Trader is not { } trader || stream.Trader == trader);
+
+        public IEnumerable<TomStream> Apply(IEnumerable<TomStream> streams) => streams.Where(Matches);
+
+        /// <summary>The months that have streams, newest first (the first day of each), for the month filter.</summary>
+        public static IReadOnlyList<DateOnly> MonthsOf(IEnumerable<TomStream> streams) =>
+            [.. streams.Select(s => new DateOnly(s.Date.Year, s.Date.Month, 1)).Distinct().OrderDescending()];
+    }
+
+    public static class TomLabels
+    {
+        /// <summary>
+        /// How a stream is named in the list: "Tom · EU". A stream from before traders and sessions were recorded keeps
+        /// the title it was given, or the site of its link.
+        /// </summary>
+        public static string Of(TomStream stream)
+        {
+            var parts = new[] { stream.Trader?.ToString(), stream.Session?.ToString() }.OfType<string>().ToList();
+            if (parts.Count > 0) return string.Join(" · ", parts);
+            if (!string.IsNullOrWhiteSpace(stream.Title)) return stream.Title.Trim();
+            return TomLinks.IsWebLink(stream.Url) ? new Uri(stream.Url!.Trim()).Host.Replace("www.", "") : "Stream";
+        }
+    }
+}
