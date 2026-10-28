@@ -1222,7 +1222,8 @@ h1:focus {
 .app-tom-trades-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .app-tom-label { font-size: 10px; font-weight: 700; color: var(--app-text-secondary); letter-spacing: .04em; }
 .app-tom-empty { padding: 28px; text-align: center; color: var(--app-text-secondary); font-size: 13px; }
-.app-tom-notes { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.app-tom-notes { padding: 4px 0; }
+.app-tom-note-title { display: inline-flex; align-items: center; gap: 8px; }
 .app-tom-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
 @media (max-width: 960px) {

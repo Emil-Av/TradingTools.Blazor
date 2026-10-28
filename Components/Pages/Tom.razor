@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @using Models.Tom
 @using TradingTools.Blazor.Services.Tom
+@using TradingTools.Blazor.Services.Reviews
 
 <MudProviders />
 
@@ -237,26 +238,49 @@
 
                     @* Two notes, one above the other: the trade's own, and the stream's, which stay as you go through the trades.
                        Each editor is keyed by what it belongs to, so switching never shows the previous text. *@
-                    <div class="app-tom-notes">
-                        <div class="app-card app-tom-note">
-                            <div class="app-tom-label">THIS TRADE</div>
-                            @if (CurrentTrade is { } noteTrade)
-                            {
-                                <RichTextEditor @key="@($"tom-trade-{noteTrade.Id}")" @bind-Value="noteTrade.Notes" Height="240" />
-                            }
-                            else
-                            {
-                                <div class="app-tom-empty">Add a trade to write about it.</div>
-                            }
-                        </div>
-                        <div class="app-card app-tom-note">
-                            <div class="app-tom-label">STREAM NOTES</div>
-                            <RichTextEditor @key="@($"tom-stream-{stream.Id}")" @bind-Value="stream.Notes" Height="240" />
-                        </div>
+                    @* Like the journal on the Trades page: collapsed to start with, a green dot on the ones with text. *@
+                    <div class="app-card app-tom-notes">
+                        <MudExpansionPanels MultiExpansion="true" Elevation="0" Class="app-expansion">
+                            <MudExpansionPanel>
+                                <TitleContent>
+                                    <span class="app-tom-note-title">
+                                        This trade
+                                        @if (ReviewSchedule.IsFilled(CurrentTrade?.Notes))
+                                        {
+                                            <span class="app-filled-dot" title="Has text"></span>
+                                        }
+                                    </span>
+                                </TitleContent>
+                                <ChildContent>
+                                    @if (CurrentTrade is { } noteTrade)
+                                    {
+                                        <RichTextEditor @key="@($"tom-trade-{noteTrade.Id}")" @bind-Value="noteTrade.Notes" />
+                                    }
+                                    else
+                                    {
+                                        <div class="app-tom-empty">Add a trade to write about it.</div>
+                                    }
+                                </ChildContent>
+                            </MudExpansionPanel>
+                            <MudExpansionPanel>
+                                <TitleContent>
+                                    <span class="app-tom-note-title">
+                                        Stream notes
+                                        @if (ReviewSchedule.IsFilled(stream.Notes))
+                                        {
+                                            <span class="app-filled-dot" title="Has text"></span>
+                                        }
+                                    </span>
+                                </TitleContent>
+                                <ChildContent>
+                                    <RichTextEditor @key="@($"tom-stream-{stream.Id}")" @bind-Value="stream.Notes" />
+                                </ChildContent>
+                            </MudExpansionPanel>
+                        </MudExpansionPanels>
                     </div>
 
                     <div class="app-tom-actions">
-                        <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Save" OnClick="SaveAsync" Disabled="@(_busy || !HasUnsavedChanges)">Save</MudButton>
+                        <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Save" OnClick="SaveAsync" Disabled="_busy">Save</MudButton>
                         @if (HasUnsavedChanges)
                         {
                             <span class="app-chip app-chip-neutral">Unsaved changes</span>
