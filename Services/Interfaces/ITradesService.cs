@@ -27,5 +27,8 @@ namespace TradingTools.Blazor.Services.Interfaces
 
         /// <summary>The sample size a trade belongs to, or null if the trade doesn't exist (used to open a trade directly from a link).</summary>
         Task<int?> GetSampleSizeIdOfTradeAsync(int tradeId);
+
+        /// <summary>The trades of a strategy, account and timeframe within a date range, across all their sample sizes, oldest first.</summary>
+        Task<List<object>> LoadTradesInRangeAsync(Strategy strategy, SampleSizeType sampleSizeType, TimeFrame timeFrame, TradeDateRange range);
     }
 }

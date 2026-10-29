@@ -184,8 +184,8 @@ namespace TradingTools.Blazor.Components.Pages
         #endregion
 
         private int SampleSizePosition => _vm is null ? 0 : _vm.SampleSizes.FindIndex(s => s.Id == _vm.CurrentSampleSize.Id);
-        private bool CanGoPrevSampleSize => SampleSizePosition > 0;
-        private bool CanGoNextSampleSize => _vm is not null && SampleSizePosition < _vm.SampleSizes.Count - 1;
+        private bool CanGoPrevSampleSize => !InRange && SampleSizePosition > 0;
+        private bool CanGoNextSampleSize => !InRange && _vm is not null && SampleSizePosition < _vm.SampleSizes.Count - 1;
 
         #region Reviews
 
@@ -263,6 +263,103 @@ namespace TradingTools.Blazor.Components.Pages
             _loading = false;
         }
 
+        #region Date range
+
+        // From / To on the page; the range only applies once at least one of them is set.
+        private DateTime? _rangeFrom;
+        private DateTime? _rangeTo;
+
+        /// <summary>The range in use: the trades of the selected strategy, account and timeframe within it, across sample sizes.</summary>
+        private TradeDateRange? _range;
+
+        private bool InRange => _range is { IsSet: true };
+
+        private async Task SetRangeFromAsync(DateTime? from)
+        {
+            _rangeFrom = from;
+            await ApplyRangeAsync();
+        }
+
+        private async Task SetRangeToAsync(DateTime? to)
+        {
+            _rangeTo = to;
+            await ApplyRangeAsync();
+        }
+
+        /// <summary>
+        /// Shows the trades within the range, oldest first, starting with the first. Without dates it goes back to the
+        /// sample sizes, staying on the sample size of the trade that was on screen.
+        /// </summary>
+        private async Task ApplyRangeAsync()
+        {
+            if (_vm is null) return;
+
+            var range = new TradeDateRange(
+                _rangeFrom is { } from ? DateOnly.FromDateTime(from) : null,
+                _rangeTo is { } to ? DateOnly.FromDateTime(to) : null);
+
+            if (!range.IsSet)
+            {
+                await ClearRangeAsync();
+                return;
+            }
+
+            _loading = true;
+            var shownTradeId = CurrentBase?.Id;
+            _range = range;
+            var sampleSize = _vm.CurrentSampleSize;
+            _vm.AllTradesInSampleSize = await TradesService.LoadTradesInRangeAsync(sampleSize.Strategy, sampleSize.SampleSizeType, sampleSize.TimeFrame, range);
+
+            // Stay on the trade that was on screen when it is in the range, otherwise start with the first.
+            int index = _vm.AllTradesInSampleSize.FindIndex(t => t is BaseTrade trade && trade.Id == shownTradeId);
+            _tradeIndex = Math.Max(0, index);
+            _screenshotIndex = 0;
+            await OnRangeTradeShownAsync();
+            _loading = false;
+        }
+
+        /// <summary>Applies the range again after something reloaded the trades (another strategy, account, timeframe, a delete).</summary>
+        private async Task ReapplyRangeAsync()
+        {
+            if (InRange) await ApplyRangeAsync();
+        }
+
+        private async Task ClearRangeAsync()
+        {
+            _rangeFrom = null;
+            _rangeTo = null;
+            if (!InRange || _vm is null) return;
+
+            _range = null;
+            _loading = true;
+            var shown = CurrentBase;
+            var scope = _vm.CurrentSampleSize;
+            // Back on the trade's own sample size; with no trade on screen (an empty range), on the same strategy, account and timeframe.
+            _vm = shown is not null
+                ? await TradesService.LoadSampleSizeNumberAsync(shown.SampleSizeId)
+                : await TradesService.LoadTimeFrameAsync(new TradesLoadTimeFrameRequestModel
+                {
+                    Strategy = scope.Strategy,
+                    SampleSizeType = scope.SampleSizeType,
+                    TimeFrame = scope.TimeFrame
+                });
+            ResetIndexes();
+            int index = _vm.AllTradesInSampleSize.FindIndex(t => t is BaseTrade trade && trade.Id == shown?.Id);
+            if (index >= 0) _tradeIndex = index;
+            await OnSampleSizeShownAsync();
+            _loading = false;
+        }
+
+        /// <summary>In a range the trades come from several sample sizes: the one of the trade on screen is the current one (Review tab).</summary>
+        private async Task OnRangeTradeShownAsync()
+        {
+            if (!InRange || _vm is null || CurrentBase?.SampleSize is not { } sampleSize || sampleSize.Id == _vm.CurrentSampleSize.Id) return;
+            _vm.CurrentSampleSize = sampleSize;
+            await OnSampleSizeShownAsync();
+        }
+
+        #endregion
+
         private void ResetIndexes()
         {
             _tradeIndex = (_vm?.AllTradesInSampleSize.Count ?? 0) - 1;
@@ -270,8 +367,21 @@ namespace TradingTools.Blazor.Components.Pages
             _screenshotIndex = 0;
         }
 
-        private void PrevTrade() { if (_tradeIndex > 0) { _tradeIndex--; _screenshotIndex = 0; } }
-        private void NextTrade() { if (_vm is not null && _tradeIndex < _vm.AllTradesInSampleSize.Count - 1) { _tradeIndex++; _screenshotIndex = 0; } }
+        private async Task PrevTrade()
+        {
+            if (_tradeIndex <= 0) return;
+            _tradeIndex--;
+            _screenshotIndex = 0;
+            await OnRangeTradeShownAsync();
+        }
+
+        private async Task NextTrade()
+        {
+            if (_vm is null || _tradeIndex >= _vm.AllTradesInSampleSize.Count - 1) return;
+            _tradeIndex++;
+            _screenshotIndex = 0;
+            await OnRangeTradeShownAsync();
+        }
 
         private void PrevScreenshot() { if (_screenshotIndex > 0) _screenshotIndex--; }
         private void NextScreenshot() { if (CurrentBase?.ScreenshotsUrls is { } urls && _screenshotIndex < urls.Count - 1) _screenshotIndex++; }
@@ -303,6 +413,7 @@ namespace TradingTools.Blazor.Components.Pages
             _vm = await TradesService.LoadStrategyAsync(strategy, _vm.CurrentSampleSize.SampleSizeType);
             ResetIndexes();
             await OnSampleSizeShownAsync();
+            await ReapplyRangeAsync();
             _loading = false;
         }
 
@@ -313,6 +424,7 @@ namespace TradingTools.Blazor.Components.Pages
             _vm = await TradesService.LoadTypeAsync(type, _vm.CurrentSampleSize.Strategy);
             ResetIndexes();
             await OnSampleSizeShownAsync();
+            await ReapplyRangeAsync();
             _loading = false;
         }
 
@@ -328,6 +440,7 @@ namespace TradingTools.Blazor.Components.Pages
             });
             ResetIndexes();
             await OnSampleSizeShownAsync();
+            await ReapplyRangeAsync();
             _loading = false;
         }
 
@@ -517,6 +630,7 @@ namespace TradingTools.Blazor.Components.Pages
                 _vm = await TradesService.InitializeTradesViewModelAsync();
                 ResetIndexes();
                 await OnSampleSizeShownAsync();
+                await ReapplyRangeAsync();
             }
             catch (Exception ex)
             {

@@ -387,6 +387,33 @@ namespace TradingTools.Blazor.Services
             return trade.ScreenshotsUrls;
         }
 
+        /// <summary>
+        /// The trades of a strategy, account and timeframe dated within the range, across all their sample sizes, oldest
+        /// first. Each comes with its sample size (and that one's review), since the trades no longer share one.
+        /// </summary>
+        public async Task<List<object>> LoadTradesInRangeAsync(Strategy strategy, SampleSizeType sampleSizeType, TimeFrame timeFrame, TradeDateRange range)
+        {
+            if (!range.IsSet || range.IsBackwards) return [];
+
+            const string include = "Journal,SampleSize,SampleSize.Review," + TradeAddOns.Include;
+            DateOnly? from = range.From, to = range.To;
+
+            async Task<List<object>> Load<T>(DataAccess.Repository.IRepository.IRepository<T> repository) where T : BaseTrade =>
+                [.. range.Apply(await repository.GetAllAsync(
+                        t => t.SampleSize!.Strategy == strategy && t.SampleSize.SampleSizeType == sampleSizeType && t.SampleSize.TimeFrame == timeFrame
+                             && (from == null || t.Date >= from) && (to == null || t.Date <= to),
+                        include))
+                    .Select(WithSortedAddOns).Cast<object>()];
+
+            return strategy switch
+            {
+                Strategy.SRS => await Load(_unitOfWork.SRS),
+                Strategy.Espresso => await Load(_unitOfWork.Espresso),
+                Strategy.BrunchBreak => await Load(_unitOfWork.BrunchBreak),
+                _ => []
+            };
+        }
+
         public async Task<bool> SampleSizeExistsAsync(int sampleSizeId) =>
             await _unitOfWork.SampleSize.GetAsync(s => s.Id == sampleSizeId && s.SampleSizeType != SampleSizeType.Research) is not null;
 

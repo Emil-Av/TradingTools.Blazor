@@ -12,9 +12,44 @@
 
 <TopBar Title="Trades" />
 
+@* From / To: the trades of the selected strategy, account and timeframe in that range, across their sample sizes. *@
+@if (_vm is not null)
+{
+    <div class="app-card app-trades-range">
+        <div class="app-trades-range-date">
+            <MudDatePicker Culture="AppCulture.DatePicker" Margin="Margin.Dense" Label="From" Variant="Variant.Outlined" Clearable="true"
+                           Date="_rangeFrom" DateChanged="SetRangeFromAsync" />
+        </div>
+        <div class="app-trades-range-date">
+            <MudDatePicker Culture="AppCulture.DatePicker" Margin="Margin.Dense" Label="To" Variant="Variant.Outlined" Clearable="true"
+                           Date="_rangeTo" DateChanged="SetRangeToAsync" />
+        </div>
+        @if (_range is { IsSet: true } range)
+        {
+            <span class="app-trades-range-info">
+                @(range.IsBackwards ? "From is after To" : $"{_vm.AllTradesInSampleSize.Count} {(_vm.AllTradesInSampleSize.Count == 1 ? "trade" : "trades")} {range.Describe()}, across sample sizes")
+            </span>
+            <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Filled.FilterAltOff" OnClick="ClearRangeAsync" Disabled="_loading">Clear dates</MudButton>
+        }
+        else
+        {
+            <span class="app-trades-range-info">Pick dates to go through the trades of that period, whatever sample size they are in.</span>
+        }
+    </div>
+}
+
 @if (_loading)
 {
     <MudProgressLinear Indeterminate="true" Color="Color.Success" />
+}
+else if (_vm is not null && InRange && CurrentTradeObj is null)
+{
+    <div class="app-card" style="padding:48px; text-align:center;">
+        <MudText Typo="Typo.h6">No trades in these dates</MudText>
+        <MudText Typo="Typo.body2" Style="color:var(--app-text-secondary); margin-top:6px;">
+            @MyEnumConverter.StrategyFromEnum(_vm.CurrentSampleSize.Strategy) · @MyEnumConverter.TimeFrameFromEnum(_vm.CurrentSampleSize.TimeFrame) · @MyEnumConverter.TradeTypeFromEnum(_vm.CurrentSampleSize.SampleSizeType) has no trades @_range!.Describe().
+        </MudText>
+    </div>
 }
 else if (_vm is null || CurrentTradeObj is null)
 {
