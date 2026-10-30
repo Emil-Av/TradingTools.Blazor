@@ -130,6 +130,38 @@ namespace TradingTools.Blazor.Tests.Screenshots
         }
 
         [Fact]
+        public void A_trade_without_screenshots_gets_its_own_folder_by_id_next_to_the_sample_sizes()
+        {
+            string folder = ScreenshotStorage.FolderByTradeId(_webRoot.Path, SampleSizeType.DemoTrading, nameof(SRS), TimeFrame.M15, 5197);
+
+            folder.Should().Be(_webRoot["Screenshots/Demo Trading/SRS/15M/By trade id/Trade 5197"]);
+        }
+
+        [Fact]
+        public async Task The_folder_by_id_never_counts_as_a_sample_size_for_new_trades()
+        {
+            _webRoot.File("Screenshots/Demo Trading/SRS/15M/Sample Size 2/Trade 4/a.png");
+            await ScreenshotStorage.SaveFilesToFolderAsync(_webRoot.Path,
+                ScreenshotStorage.FolderByTradeId(_webRoot.Path, SampleSizeType.DemoTrading, nameof(SRS), TimeFrame.M15, 5197), [File("later.png")]);
+
+            var paths = await ScreenshotStorage.SaveFilesAsync(_webRoot.Path, ViewModel(), new SRS(), [File("b.png")], isSampleSizeFull: false);
+
+            paths.Should().Equal("Screenshots/Demo Trading/SRS/15M/Sample Size 2/Trade 5/b.png");
+        }
+
+        [Fact]
+        public async Task The_folder_by_id_never_counts_when_a_full_sample_size_starts_the_next_one()
+        {
+            _webRoot.File("Screenshots/Demo Trading/SRS/15M/Sample Size 3/Trade 20/a.png");
+            await ScreenshotStorage.SaveFilesToFolderAsync(_webRoot.Path,
+                ScreenshotStorage.FolderByTradeId(_webRoot.Path, SampleSizeType.DemoTrading, nameof(SRS), TimeFrame.M15, 99), [File("later.png")]);
+
+            var paths = await ScreenshotStorage.SaveFilesAsync(_webRoot.Path, ViewModel(), new SRS(), [File("b.png")], isSampleSizeFull: true);
+
+            paths.Should().Equal("Screenshots/Demo Trading/SRS/15M/Sample Size 4/Trade 1/b.png");
+        }
+
+        [Fact]
         public async Task File_content_is_written()
         {
             var paths = await ScreenshotStorage.SaveFilesAsync(_webRoot.Path, ViewModel(), new SRS(), [File("a.png", "image-bytes")], false);

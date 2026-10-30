@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Http;
 using Models.ViewModels;
 using Shared;
+using SharedEnums.Enums;
 
 namespace TradingTools.Blazor.Services.Screenshots
 {
@@ -39,6 +40,24 @@ namespace TradingTools.Blazor.Services.Screenshots
             string tradeFolder = NextTradeFolder(strategyFolder, isSampleSizeFull);
             return await SaveFilesToFolderAsync(webRootPath, tradeFolder, files);
         }
+
+        /// <summary>Where a trade's own folder by id goes, next to the sample size folders. Its name has no number, so it never counts as a sample size.</summary>
+        public const string ByTradeIdFolderName = "By trade id";
+
+        /// <summary>
+        /// The folder for new screenshots of a trade that has none left: once its last screenshot is deleted, the folder
+        /// it was in is no longer known. So it gets its own folder by trade id, e.g.
+        /// Screenshots/Demo Trading/SRS/15M/By trade id/Trade 5197.
+        /// </summary>
+        /// <param name="strategyFolderName">The trade's class name, as for new trades (SRS, Espresso, ...).</param>
+        public static string FolderByTradeId(string webRootPath, SampleSizeType sampleSizeType, string strategyFolderName, TimeFrame timeFrame, int tradeId) =>
+            Path.Combine(
+                GetRoot(webRootPath),
+                MyEnumConverter.TradeTypeFromEnum(sampleSizeType),
+                strategyFolderName,
+                MyEnumConverter.TimeFrameFromEnum(timeFrame),
+                ByTradeIdFolderName,
+                $"Trade {tradeId}");
 
         /// <summary>
         /// The folder for the next trade: a new "Trade n" in the latest sample size, or "Sample Size n+1/Trade 1"

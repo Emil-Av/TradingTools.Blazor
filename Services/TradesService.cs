@@ -359,9 +359,10 @@ namespace TradingTools.Blazor.Services
             // Get the trade to determine its folder path
             var trade = await _unitOfWork.BaseTrade.GetAsync(t => t.Id == tradeId) ?? throw new ArgumentException($"Trade with ID {tradeId} not found.");
 
-            // Get the existing screenshots folder path from the first screenshot URL
+            // The folder of the screenshots it has; a trade with none left (its last one was deleted) gets its own folder by id.
+            trade.ScreenshotsUrls ??= [];
             string tradeFolderPath;
-            if (trade.ScreenshotsUrls!.Any())
+            if (trade.ScreenshotsUrls.Count > 0)
             {
                 // Extract the folder path from the first screenshot URL
                 string firstScreenshotUrl = trade.ScreenshotsUrls![0];
@@ -373,7 +374,12 @@ namespace TradingTools.Blazor.Services
             }
             else
             {
-                throw new InvalidOperationException("Cannot upload screenshots to a trade that has no existing screenshots folder.");
+                // Read on its own, not included in the trade: the trade is saved with Update below, which would try to
+                // attach the sample size too - and the page already tracks it.
+                var sampleSize = await _unitOfWork.SampleSize.GetAsync(s => s.Id == trade.SampleSizeId)
+                    ?? throw new InvalidOperationException($"The sample size of trade {tradeId} was not found.");
+                tradeFolderPath = ScreenshotStorage.FolderByTradeId(
+                    webHostEnvironment.WebRootPath, sampleSize.SampleSizeType, trade.GetType().Name, sampleSize.TimeFrame, trade.Id);
             }
 
             // Save the files to disk
