@@ -1283,3 +1283,4 @@ h1:focus {
 .app-fs-result-numbers { font-size: 14px; font-weight: 700; font-family: var(--app-font-numbers); }
 .app-fs-result-meta { font-size: 11.5px; color: rgba(255, 255, 255, .7); }
 .app-fs-result .app-flat { color: #fff; }
+.app-trades-range-choice { flex: 0 0 160px; }

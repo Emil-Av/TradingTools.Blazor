@@ -394,18 +394,19 @@ namespace TradingTools.Blazor.Services
         }
 
         /// <summary>
-        /// The trades of a strategy, account and timeframe dated within the range, across all their sample sizes, oldest
+        /// The trades of a strategy, account and timeframe that match the filter (dates, symbol, result), across all their sample sizes, oldest
         /// first. Each comes with its sample size (and that one's review), since the trades no longer share one.
         /// </summary>
-        public async Task<List<object>> LoadTradesInRangeAsync(Strategy strategy, SampleSizeType sampleSizeType, TimeFrame timeFrame, TradeDateRange range)
+        public async Task<List<object>> LoadFilteredTradesAsync(Strategy strategy, SampleSizeType sampleSizeType, TimeFrame timeFrame, TradeFilter filter)
         {
-            if (!range.IsSet || range.IsBackwards) return [];
+            if (!filter.IsSet || filter.IsBackwards) return [];
 
             const string include = "Journal,SampleSize,SampleSize.Review," + TradeAddOns.Include;
-            DateOnly? from = range.From, to = range.To;
+            // The dates narrow the query; the symbol and the result are checked by the filter itself.
+            DateOnly? from = filter.EffectiveFrom, to = filter.EffectiveTo;
 
             async Task<List<object>> Load<T>(DataAccess.Repository.IRepository.IRepository<T> repository) where T : BaseTrade =>
-                [.. range.Apply(await repository.GetAllAsync(
+                [.. filter.Apply(await repository.GetAllAsync(
                         t => t.SampleSize!.Strategy == strategy && t.SampleSize.SampleSizeType == sampleSizeType && t.SampleSize.TimeFrame == timeFrame
                              && (from == null || t.Date >= from) && (to == null || t.Date <= to),
                         include))

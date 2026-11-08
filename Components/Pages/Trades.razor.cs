@@ -184,8 +184,8 @@ namespace TradingTools.Blazor.Components.Pages
         #endregion
 
         private int SampleSizePosition => _vm is null ? 0 : _vm.SampleSizes.FindIndex(s => s.Id == _vm.CurrentSampleSize.Id);
-        private bool CanGoPrevSampleSize => !InRange && SampleSizePosition > 0;
-        private bool CanGoNextSampleSize => !InRange && _vm is not null && SampleSizePosition < _vm.SampleSizes.Count - 1;
+        private bool CanGoPrevSampleSize => !Filtering && SampleSizePosition > 0;
+        private bool CanGoNextSampleSize => !Filtering && _vm is not null && SampleSizePosition < _vm.SampleSizes.Count - 1;
 
         #region Reviews
 
@@ -271,14 +271,14 @@ namespace TradingTools.Blazor.Components.Pages
         private bool _browsing;
 
         private BrowseStep? NextTradeStep => _vm is null ? null
-            : TradeBrowsing.NextTrade(_tradeIndex, _vm.AllTradesInSampleSize.Count, SampleSizePosition, _vm.SampleSizes.Count, acrossSampleSizes: !InRange);
+            : TradeBrowsing.NextTrade(_tradeIndex, _vm.AllTradesInSampleSize.Count, SampleSizePosition, _vm.SampleSizes.Count, acrossSampleSizes: !Filtering);
 
         private BrowseStep? PrevTradeStep => _vm is null ? null
-            : TradeBrowsing.PrevTrade(_tradeIndex, SampleSizePosition, acrossSampleSizes: !InRange);
+            : TradeBrowsing.PrevTrade(_tradeIndex, SampleSizePosition, acrossSampleSizes: !Filtering);
 
-        private BrowseStep? NextSampleSizeStep => _vm is null || InRange ? null : TradeBrowsing.NextSampleSize(SampleSizePosition, _vm.SampleSizes.Count);
+        private BrowseStep? NextSampleSizeStep => _vm is null || Filtering ? null : TradeBrowsing.NextSampleSize(SampleSizePosition, _vm.SampleSizes.Count);
 
-        private BrowseStep? PrevSampleSizeStep => _vm is null || InRange ? null : TradeBrowsing.PrevSampleSize(SampleSizePosition);
+        private BrowseStep? PrevSampleSizeStep => _vm is null || Filtering ? null : TradeBrowsing.PrevSampleSize(SampleSizePosition);
 
         /// <summary>The outcome and result after the spread of the trade on screen, for the box in the bottom left corner.</summary>
         private ResultBadge? CurrentBadge => CurrentBase is null ? null : TradeBrowsing.Result(CurrentBase.Outcome, CurrentResult);
@@ -296,7 +296,7 @@ namespace TradingTools.Blazor.Components.Pages
             {
                 _tradeIndex = index;
                 _screenshotIndex = 0;
-                await OnRangeTradeShownAsync();
+                await OnFilteredTradeShownAsync();
                 return;
             }
 
@@ -318,78 +318,115 @@ namespace TradingTools.Blazor.Components.Pages
 
         #endregion
 
-        #region Date range
+        #region Filter
 
-        // From / To on the page; the range only applies once at least one of them is set.
-        private DateTime? _rangeFrom;
-        private DateTime? _rangeTo;
+        // The filter bar: all parts apply together. With any part set the trade arrows go through the matching trades of
+        // the selected strategy, account and timeframe, oldest first, across their sample sizes.
+        private bool _filterAll;
+        private DateTime? _filterFrom;
+        private DateTime? _filterTo;
+        private ESymbol? _filterSymbol;
+        private EOutcome? _filterOutcome;
 
-        /// <summary>The range in use: the trades of the selected strategy, account and timeframe within it, across sample sizes.</summary>
-        private TradeDateRange? _range;
+        /// <summary>The filter in use; null while the page shows its sample sizes as usual.</summary>
+        private TradeFilter? _filter;
 
-        private bool InRange => _range is { IsSet: true };
+        private bool Filtering => _filter is { IsSet: true };
 
-        private async Task SetRangeFromAsync(DateTime? from)
+        private TradeFilter FilterFromBar() => new(
+            _filterAll,
+            _filterFrom is { } from ? DateOnly.FromDateTime(from) : null,
+            _filterTo is { } to ? DateOnly.FromDateTime(to) : null,
+            _filterSymbol,
+            _filterOutcome);
+
+        /// <summary>"All": every trade, whatever its date - the dates are cleared.</summary>
+        private async Task ToggleAllDatesAsync()
         {
-            _rangeFrom = from;
-            await ApplyRangeAsync();
+            _filterAll = !_filterAll;
+            if (_filterAll)
+            {
+                _filterFrom = null;
+                _filterTo = null;
+            }
+            await ApplyFilterAsync();
         }
 
-        private async Task SetRangeToAsync(DateTime? to)
+        /// <summary>Picking a date ends "All": a period is chosen instead.</summary>
+        private async Task SetFilterFromAsync(DateTime? from)
         {
-            _rangeTo = to;
-            await ApplyRangeAsync();
+            _filterFrom = from;
+            if (from is not null) _filterAll = false;
+            await ApplyFilterAsync();
+        }
+
+        private async Task SetFilterToAsync(DateTime? to)
+        {
+            _filterTo = to;
+            if (to is not null) _filterAll = false;
+            await ApplyFilterAsync();
+        }
+
+        private async Task SetFilterSymbolAsync(ESymbol? symbol)
+        {
+            _filterSymbol = symbol;
+            await ApplyFilterAsync();
+        }
+
+        private async Task SetFilterOutcomeAsync(EOutcome? outcome)
+        {
+            _filterOutcome = outcome;
+            await ApplyFilterAsync();
         }
 
         /// <summary>
-        /// Shows the trades within the range, oldest first, starting with the first. Without dates it goes back to the
-        /// sample sizes, staying on the sample size of the trade that was on screen.
+        /// Shows the matching trades, oldest first, staying on the trade on screen when it matches. Without any filter it
+        /// goes back to the sample sizes, staying on the sample size of the trade that was on screen.
         /// </summary>
-        private async Task ApplyRangeAsync()
+        private async Task ApplyFilterAsync()
         {
             if (_vm is null) return;
 
-            var range = new TradeDateRange(
-                _rangeFrom is { } from ? DateOnly.FromDateTime(from) : null,
-                _rangeTo is { } to ? DateOnly.FromDateTime(to) : null);
-
-            if (!range.IsSet)
+            var filter = FilterFromBar();
+            if (!filter.IsSet)
             {
-                await ClearRangeAsync();
+                await ClearFilterAsync();
                 return;
             }
 
             _loading = true;
             var shownTradeId = CurrentBase?.Id;
-            _range = range;
+            _filter = filter;
             var sampleSize = _vm.CurrentSampleSize;
-            _vm.AllTradesInSampleSize = await TradesService.LoadTradesInRangeAsync(sampleSize.Strategy, sampleSize.SampleSizeType, sampleSize.TimeFrame, range);
+            _vm.AllTradesInSampleSize = await TradesService.LoadFilteredTradesAsync(sampleSize.Strategy, sampleSize.SampleSizeType, sampleSize.TimeFrame, filter);
 
-            // Stay on the trade that was on screen when it is in the range, otherwise start with the first.
             int index = _vm.AllTradesInSampleSize.FindIndex(t => t is BaseTrade trade && trade.Id == shownTradeId);
             _tradeIndex = Math.Max(0, index);
             _screenshotIndex = 0;
-            await OnRangeTradeShownAsync();
+            await OnFilteredTradeShownAsync();
             _loading = false;
         }
 
-        /// <summary>Applies the range again after something reloaded the trades (another strategy, account, timeframe, a delete).</summary>
-        private async Task ReapplyRangeAsync()
+        /// <summary>Applies the filter again after something reloaded the trades (another strategy, account, timeframe, a delete).</summary>
+        private async Task ReapplyFilterAsync()
         {
-            if (InRange) await ApplyRangeAsync();
+            if (Filtering) await ApplyFilterAsync();
         }
 
-        private async Task ClearRangeAsync()
+        private async Task ClearFilterAsync()
         {
-            _rangeFrom = null;
-            _rangeTo = null;
-            if (!InRange || _vm is null) return;
+            _filterAll = false;
+            _filterFrom = null;
+            _filterTo = null;
+            _filterSymbol = null;
+            _filterOutcome = null;
+            if (!Filtering || _vm is null) return;
 
-            _range = null;
+            _filter = null;
             _loading = true;
             var shown = CurrentBase;
             var scope = _vm.CurrentSampleSize;
-            // Back on the trade's own sample size; with no trade on screen (an empty range), on the same strategy, account and timeframe.
+            // Back on the trade's own sample size; with no trade on screen (nothing matched), on the same strategy, account and timeframe.
             _vm = shown is not null
                 ? await TradesService.LoadSampleSizeNumberAsync(shown.SampleSizeId)
                 : await TradesService.LoadTimeFrameAsync(new TradesLoadTimeFrameRequestModel
@@ -405,10 +442,10 @@ namespace TradingTools.Blazor.Components.Pages
             _loading = false;
         }
 
-        /// <summary>In a range the trades come from several sample sizes: the one of the trade on screen is the current one (Review tab).</summary>
-        private async Task OnRangeTradeShownAsync()
+        /// <summary>The filtered trades come from several sample sizes: the one of the trade on screen is the current one (Review tab).</summary>
+        private async Task OnFilteredTradeShownAsync()
         {
-            if (!InRange || _vm is null || CurrentBase?.SampleSize is not { } sampleSize || sampleSize.Id == _vm.CurrentSampleSize.Id) return;
+            if (!Filtering || _vm is null || CurrentBase?.SampleSize is not { } sampleSize || sampleSize.Id == _vm.CurrentSampleSize.Id) return;
             _vm.CurrentSampleSize = sampleSize;
             await OnSampleSizeShownAsync();
         }
@@ -427,7 +464,7 @@ namespace TradingTools.Blazor.Components.Pages
             if (_tradeIndex <= 0) return;
             _tradeIndex--;
             _screenshotIndex = 0;
-            await OnRangeTradeShownAsync();
+            await OnFilteredTradeShownAsync();
         }
 
         private async Task NextTrade()
@@ -435,7 +472,7 @@ namespace TradingTools.Blazor.Components.Pages
             if (_vm is null || _tradeIndex >= _vm.AllTradesInSampleSize.Count - 1) return;
             _tradeIndex++;
             _screenshotIndex = 0;
-            await OnRangeTradeShownAsync();
+            await OnFilteredTradeShownAsync();
         }
 
         private void PrevScreenshot() { if (_screenshotIndex > 0) _screenshotIndex--; }
@@ -468,7 +505,7 @@ namespace TradingTools.Blazor.Components.Pages
             _vm = await TradesService.LoadStrategyAsync(strategy, _vm.CurrentSampleSize.SampleSizeType);
             ResetIndexes();
             await OnSampleSizeShownAsync();
-            await ReapplyRangeAsync();
+            await ReapplyFilterAsync();
             _loading = false;
         }
 
@@ -479,7 +516,7 @@ namespace TradingTools.Blazor.Components.Pages
             _vm = await TradesService.LoadTypeAsync(type, _vm.CurrentSampleSize.Strategy);
             ResetIndexes();
             await OnSampleSizeShownAsync();
-            await ReapplyRangeAsync();
+            await ReapplyFilterAsync();
             _loading = false;
         }
 
@@ -495,7 +532,7 @@ namespace TradingTools.Blazor.Components.Pages
             });
             ResetIndexes();
             await OnSampleSizeShownAsync();
-            await ReapplyRangeAsync();
+            await ReapplyFilterAsync();
             _loading = false;
         }
 
@@ -685,7 +722,7 @@ namespace TradingTools.Blazor.Components.Pages
                 _vm = await TradesService.InitializeTradesViewModelAsync();
                 ResetIndexes();
                 await OnSampleSizeShownAsync();
-                await ReapplyRangeAsync();
+                await ReapplyFilterAsync();
             }
             catch (Exception ex)
             {

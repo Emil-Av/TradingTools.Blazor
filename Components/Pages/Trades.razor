@@ -12,28 +12,48 @@
 
 <TopBar Title="Trades" />
 
-@* From / To: the trades of the selected strategy, account and timeframe in that range, across their sample sizes. *@
+@* The filter: all parts apply together, to the trades of the selected strategy, account and timeframe, across
+   their sample sizes. The period is "All" or From / To. *@
 @if (_vm is not null)
 {
     <div class="app-card app-trades-range">
+        <MudButton Variant="@(_filterAll ? Variant.Filled : Variant.Outlined)" Color="@(_filterAll ? Color.Primary : Color.Default)" Size="Size.Small"
+                   OnClick="ToggleAllDatesAsync" Disabled="_loading" title="Every trade, whatever its date">All</MudButton>
         <div class="app-trades-range-date">
             <MudDatePicker Culture="AppCulture.DatePicker" Margin="Margin.Dense" Label="From" Variant="Variant.Outlined" Clearable="true"
-                           Date="_rangeFrom" DateChanged="SetRangeFromAsync" />
+                           Date="_filterFrom" DateChanged="SetFilterFromAsync" />
         </div>
         <div class="app-trades-range-date">
             <MudDatePicker Culture="AppCulture.DatePicker" Margin="Margin.Dense" Label="To" Variant="Variant.Outlined" Clearable="true"
-                           Date="_rangeTo" DateChanged="SetRangeToAsync" />
+                           Date="_filterTo" DateChanged="SetFilterToAsync" />
         </div>
-        @if (_range is { IsSet: true } range)
+        <div class="app-trades-range-choice">
+            <MudSelect T="ESymbol?" Margin="Margin.Dense" Label="Symbol" Value="_filterSymbol" ValueChanged="SetFilterSymbolAsync" Variant="Variant.Outlined">
+                <MudSelectItem T="ESymbol?" Value="@((ESymbol?)null)">All symbols</MudSelectItem>
+                @foreach (var s in Enum.GetValues<ESymbol>())
+                {
+                    <MudSelectItem T="ESymbol?" Value="@((ESymbol?)s)">@MyEnumConverter.SymbolFromEnum(s)</MudSelectItem>
+                }
+            </MudSelect>
+        </div>
+        <div class="app-trades-range-choice">
+            <MudSelect T="EOutcome?" Margin="Margin.Dense" Label="Result" Value="_filterOutcome" ValueChanged="SetFilterOutcomeAsync" Variant="Variant.Outlined">
+                <MudSelectItem T="EOutcome?" Value="@((EOutcome?)null)">All results</MudSelectItem>
+                <MudSelectItem T="EOutcome?" Value="@((EOutcome?)EOutcome.Win)">Wins only</MudSelectItem>
+                <MudSelectItem T="EOutcome?" Value="@((EOutcome?)EOutcome.Loss)">Losses only</MudSelectItem>
+                <MudSelectItem T="EOutcome?" Value="@((EOutcome?)EOutcome.Breakeven)">Breakevens only</MudSelectItem>
+            </MudSelect>
+        </div>
+        @if (_filter is { IsSet: true } filter)
         {
             <span class="app-trades-range-info">
-                @(range.IsBackwards ? "From is after To" : $"{_vm.AllTradesInSampleSize.Count} {(_vm.AllTradesInSampleSize.Count == 1 ? "trade" : "trades")} {range.Describe()}, across sample sizes")
+                @(filter.IsBackwards ? "From is after To" : $"{_vm.AllTradesInSampleSize.Count} {(_vm.AllTradesInSampleSize.Count == 1 ? "trade" : "trades")} · {filter.Describe()} · across sample sizes")
             </span>
-            <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Filled.FilterAltOff" OnClick="ClearRangeAsync" Disabled="_loading">Clear dates</MudButton>
+            <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Filled.FilterAltOff" OnClick="ClearFilterAsync" Disabled="_loading">Clear filters</MudButton>
         }
         else
         {
-            <span class="app-trades-range-info">Pick dates to go through the trades of that period, whatever sample size they are in.</span>
+            <span class="app-trades-range-info">Pick All or dates, a symbol, a result - or any mix - to go through those trades, whatever sample size they are in.</span>
         }
     </div>
 }
@@ -42,12 +62,12 @@
 {
     <MudProgressLinear Indeterminate="true" Color="Color.Success" />
 }
-else if (_vm is not null && InRange && CurrentTradeObj is null)
+else if (_vm is not null && Filtering && CurrentTradeObj is null)
 {
     <div class="app-card" style="padding:48px; text-align:center;">
-        <MudText Typo="Typo.h6">No trades in these dates</MudText>
+        <MudText Typo="Typo.h6">No trades match the filters</MudText>
         <MudText Typo="Typo.body2" Style="color:var(--app-text-secondary); margin-top:6px;">
-            @MyEnumConverter.StrategyFromEnum(_vm.CurrentSampleSize.Strategy) · @MyEnumConverter.TimeFrameFromEnum(_vm.CurrentSampleSize.TimeFrame) · @MyEnumConverter.TradeTypeFromEnum(_vm.CurrentSampleSize.SampleSizeType) has no trades @_range!.Describe().
+            @MyEnumConverter.StrategyFromEnum(_vm.CurrentSampleSize.Strategy) · @MyEnumConverter.TimeFrameFromEnum(_vm.CurrentSampleSize.TimeFrame) · @MyEnumConverter.TradeTypeFromEnum(_vm.CurrentSampleSize.SampleSizeType) has no trades for @_filter!.Describe().
         </MudText>
     </div>
 }
