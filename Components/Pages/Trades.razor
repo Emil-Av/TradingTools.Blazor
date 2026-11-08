@@ -105,35 +105,71 @@ else
     <div style="display:flex; flex-direction:column; gap:20px;">
 
         <div class="app-card" style="width:100%; padding:16px; display:flex; flex-direction:column; gap:12px;">
-            @if (CurrentBase!.ScreenshotsUrls is { Count: > 0 } urls)
-            {
-                @* The whole screenshot is always shown, never cropped: it fills the width at its own proportions,
-                   and is scaled down (contain) when that would be taller than 78% of the window. A fixed-size box
-                   with object-fit:cover cropped it whenever the window's shape differed from the screenshot's. *@
-                @* data-fullscreen: the whole box (image, buttons, counter) goes full screen (wwwroot/js/fullscreen.js), so
-                   the previous/next buttons - Blazor handlers - stay clickable, and the arrow keys press them. *@
-                <div class="app-carousel" data-fullscreen>
-                    <img class="app-carousel-img" src="@("/" + urls[_screenshotIndex])" alt="Screenshot @(_screenshotIndex + 1) of @urls.Count" />
-                    <button type="button" class="app-carousel-btn app-carousel-fs" onclick="appFullscreen.toggle(this)" title="Full screen (Esc to close)" aria-label="Toggle full screen">
-                        <svg class="app-fs-enter" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
-                        <svg class="app-fs-exit" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /></svg>
-                    </button>
+            @* The whole screenshot is always shown, never cropped: it fills the width at its own proportions,
+               and is scaled down (contain) when that would be taller than 78% of the window. A fixed-size box
+               with object-fit:cover cropped it whenever the window's shape differed from the screenshot's. *@
+            @* data-fullscreen: the whole box (image, buttons, counter) goes full screen (wwwroot/js/fullscreen.js), so
+               the previous/next buttons - Blazor handlers - stay clickable, and the arrow keys press them.
+               The box is always there, also for a trade without screenshots: going through the trades in full screen
+               must never take it off the page, or the browser leaves full screen. Its class never changes either: the
+               CSS fallback for full screen adds is-maximized to it, and a re-rendered class would drop that. *@
+            @{ var urls = CurrentBase!.ScreenshotsUrls ?? []; }
+            <div class="app-carousel" data-fullscreen>
+                @if (urls.Count > 0)
+                {
+                    <img class="app-carousel-img" src="@("/" + urls[Math.Min(_screenshotIndex, urls.Count - 1)])" alt="Screenshot @(_screenshotIndex + 1) of @urls.Count" />
+                }
+                else
+                {
+                    <div class="app-carousel-none">No screenshots for this trade.</div>
+                }
+                <button type="button" class="app-carousel-btn app-carousel-fs" onclick="appFullscreen.toggle(this)" title="Full screen (Esc to close)" aria-label="Toggle full screen">
+                    <svg class="app-fs-enter" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+                    <svg class="app-fs-exit" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /></svg>
+                </button>
+                @if (urls.Count > 0)
+                {
                     @* Not shown in full screen: its confirmation dialog would open behind the full-screen box. *@
                     <button type="button" class="app-carousel-btn app-carousel-del" title="Delete this screenshot" aria-label="Delete this screenshot" disabled="@_saving" @onclick="ConfirmDeleteScreenshotAsync">
                         <MudIcon Icon="@Icons.Material.Filled.DeleteOutline" Size="Size.Small" />
                     </button>
-                    @if (urls.Count > 1)
-                    {
-                        <button class="app-carousel-btn" style="left:14px;" data-fullscreen-prev aria-label="Previous screenshot" @onclick="PrevScreenshot"><MudIcon Icon="@Icons.Material.Filled.ChevronLeft" /></button>
-                        <button class="app-carousel-btn" style="right:14px;" data-fullscreen-next aria-label="Next screenshot" @onclick="NextScreenshot"><MudIcon Icon="@Icons.Material.Filled.ChevronRight" /></button>
-                        <div style="position:absolute; bottom:10px; left:0; right:0; text-align:center; color:white; font-size:11px; text-shadow:0 1px 2px black;">@(_screenshotIndex + 1) / @urls.Count</div>
-                    }
+                }
+                @if (urls.Count > 1)
+                {
+                    <button class="app-carousel-btn" style="left:14px;" data-fullscreen-prev aria-label="Previous screenshot" @onclick="PrevScreenshot"><MudIcon Icon="@Icons.Material.Filled.ChevronLeft" /></button>
+                    <button class="app-carousel-btn" style="right:14px;" data-fullscreen-next aria-label="Next screenshot" @onclick="NextScreenshot"><MudIcon Icon="@Icons.Material.Filled.ChevronRight" /></button>
+                    <div class="app-carousel-count">@(_screenshotIndex + 1) / @urls.Count</div>
+                }
+
+                @* Full screen only: go through the trades and the sample sizes (↑ / ↓ for the trades), and the result. *@
+                <div class="app-fs-only app-fs-nav">
+                    <div class="app-fs-nav-group">
+                        <span class="app-fs-nav-label">Trade</span>
+                        <button type="button" data-fullscreen-prev-trade aria-label="Previous trade" disabled="@(PrevTradeStep is null || _browsing)" @onclick="BrowsePrevTradeAsync"><MudIcon Icon="@Icons.Material.Filled.ChevronLeft" Size="Size.Small" /></button>
+                        <span class="app-fs-nav-value">@(_tradeIndex + 1) / @_vm.AllTradesInSampleSize.Count</span>
+                        <button type="button" data-fullscreen-next-trade aria-label="Next trade" disabled="@(NextTradeStep is null || _browsing)" @onclick="BrowseNextTradeAsync"><MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" /></button>
+                    </div>
+                    <div class="app-fs-nav-group">
+                        <span class="app-fs-nav-label">Sample size</span>
+                        <button type="button" aria-label="Previous sample size" disabled="@(PrevSampleSizeStep is null || _browsing)" @onclick="BrowsePrevSampleSizeAsync"><MudIcon Icon="@Icons.Material.Filled.ChevronLeft" Size="Size.Small" /></button>
+                        <span class="app-fs-nav-value">@(SampleSizePosition + 1) / @_vm.SampleSizes.Count</span>
+                        <button type="button" aria-label="Next sample size" disabled="@(NextSampleSizeStep is null || _browsing)" @onclick="BrowseNextSampleSizeAsync"><MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" /></button>
+                    </div>
                 </div>
-            }
-            else
-            {
-                <div style="padding:48px; text-align:center; color:var(--app-text-secondary);">No screenshots for this trade.</div>
-            }
+                @if (CurrentBadge is { } badge)
+                {
+                    <div class="app-fs-only app-fs-result">
+                        <span class="app-fs-result-outcome @badge.ToneClass">@badge.Outcome</span>
+                        @if (badge.Points is not null || badge.Euro is not null)
+                        {
+                            <span class="app-fs-result-numbers @badge.ToneClass">
+                                @badge.Points@(badge.Points is not null && badge.Euro is not null ? " · " : "")@badge.Euro
+                            </span>
+                        }
+                        <span class="app-fs-result-meta">@CurrentBase.Date.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture) · @(string.IsNullOrWhiteSpace(CurrentBase.Symbol) ? "—" : CurrentBase.Symbol)</span>
+                    </div>
+                }
+            </div>
         </div>
 
         <div class="app-card" style="width:100%; display:flex; flex-direction:column;">

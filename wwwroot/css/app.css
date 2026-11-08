@@ -1238,3 +1238,48 @@ h1:focus {
 .app-trades-range { padding: 10px 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; margin-bottom: 12px; }
 .app-trades-range-date { flex: 0 0 170px; }
 .app-trades-range-info { font-size: 12.5px; color: var(--app-text-secondary); }
+
+/* Trades: the carousel box is always there (full screen must not lose it); without screenshots it is just a note. */
+/* Its class is never changed by the page (the CSS full-screen fallback adds is-maximized to it), so the empty look comes from what is inside. */
+.app-carousel:has(> .app-carousel-none):not(:fullscreen):not(.is-maximized) { border: 0; background: transparent; }
+.app-carousel-none { padding: 48px; text-align: center; color: var(--app-text-secondary); }
+.app-carousel:fullscreen .app-carousel-none,
+.app-carousel.is-maximized .app-carousel-none { color: #ccc; font-size: 15px; }
+.app-carousel-count {
+    position: absolute; bottom: 10px; left: 0; right: 0;
+    text-align: center; color: white; font-size: 11px; text-shadow: 0 1px 2px black;
+    pointer-events: none;
+}
+
+/* Full screen only: going through the trades and sample sizes, and the trade's result. */
+.app-fs-only { display: none; }
+.app-carousel:fullscreen .app-fs-only,
+.app-carousel.is-maximized .app-fs-only { display: flex; }
+.app-fs-nav {
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    gap: 10px; align-items: center;
+}
+.app-fs-nav-group {
+    display: flex; align-items: center; gap: 4px;
+    padding: 4px 6px 4px 12px; border-radius: 999px;
+    background: rgba(0, 0, 0, .62); color: #fff;
+}
+.app-fs-nav-label { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: rgba(255,255,255,.7); margin-right: 4px; }
+.app-fs-nav-value { font-size: 13px; font-weight: 600; min-width: 52px; text-align: center; font-family: var(--app-font-numbers); }
+.app-fs-nav-group button {
+    width: 30px; height: 30px; border-radius: 999px; border: none; background: transparent; color: #fff;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.app-fs-nav-group button:hover:not(:disabled) { background: rgba(255, 255, 255, .16); }
+.app-fs-nav-group button:disabled { opacity: .35; cursor: default; }
+.app-fs-result {
+    position: absolute; left: 14px; bottom: 14px;
+    flex-direction: column; gap: 2px;
+    padding: 10px 14px; border-radius: 10px;
+    background: rgba(0, 0, 0, .62); color: #fff;
+    pointer-events: none;
+}
+.app-fs-result-outcome { font-size: 18px; font-weight: 800; }
+.app-fs-result-numbers { font-size: 14px; font-weight: 700; font-family: var(--app-font-numbers); }
+.app-fs-result-meta { font-size: 11.5px; color: rgba(255, 255, 255, .7); }
+.app-fs-result .app-flat { color: #fff; }

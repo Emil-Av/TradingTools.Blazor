@@ -263,6 +263,61 @@ namespace TradingTools.Blazor.Components.Pages
             _loading = false;
         }
 
+        #region Full-screen review
+
+        // Full screen goes through every trade: the trade arrows go on into the next or previous sample size at the ends.
+        // Nothing here may show the loading bar: it would take the carousel - the full-screen element - off the page,
+        // and the browser would leave full screen.
+        private bool _browsing;
+
+        private BrowseStep? NextTradeStep => _vm is null ? null
+            : TradeBrowsing.NextTrade(_tradeIndex, _vm.AllTradesInSampleSize.Count, SampleSizePosition, _vm.SampleSizes.Count, acrossSampleSizes: !InRange);
+
+        private BrowseStep? PrevTradeStep => _vm is null ? null
+            : TradeBrowsing.PrevTrade(_tradeIndex, SampleSizePosition, acrossSampleSizes: !InRange);
+
+        private BrowseStep? NextSampleSizeStep => _vm is null || InRange ? null : TradeBrowsing.NextSampleSize(SampleSizePosition, _vm.SampleSizes.Count);
+
+        private BrowseStep? PrevSampleSizeStep => _vm is null || InRange ? null : TradeBrowsing.PrevSampleSize(SampleSizePosition);
+
+        /// <summary>The outcome and result after the spread of the trade on screen, for the box in the bottom left corner.</summary>
+        private ResultBadge? CurrentBadge => CurrentBase is null ? null : TradeBrowsing.Result(CurrentBase.Outcome, CurrentResult);
+
+        private Task BrowseNextTradeAsync() => BrowseAsync(NextTradeStep);
+        private Task BrowsePrevTradeAsync() => BrowseAsync(PrevTradeStep);
+        private Task BrowseNextSampleSizeAsync() => BrowseAsync(NextSampleSizeStep);
+        private Task BrowsePrevSampleSizeAsync() => BrowseAsync(PrevSampleSizeStep);
+
+        private async Task BrowseAsync(BrowseStep? step)
+        {
+            if (step is null || _vm is null || _browsing) return;
+
+            if (step.TradeIndex is { } index)
+            {
+                _tradeIndex = index;
+                _screenshotIndex = 0;
+                await OnRangeTradeShownAsync();
+                return;
+            }
+
+            if (step.SampleSizePosition is not { } position || position < 0 || position >= _vm.SampleSizes.Count) return;
+
+            _browsing = true;
+            try
+            {
+                _vm = await TradesService.LoadSampleSizeNumberAsync(_vm.SampleSizes[position].Id);
+                _tradeIndex = step.AtLastTrade ? Math.Max(0, _vm.AllTradesInSampleSize.Count - 1) : 0;
+                _screenshotIndex = 0;
+                await OnSampleSizeShownAsync();
+            }
+            finally
+            {
+                _browsing = false;
+            }
+        }
+
+        #endregion
+
         #region Date range
 
         // From / To on the page; the range only applies once at least one of them is set.

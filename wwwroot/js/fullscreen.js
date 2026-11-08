@@ -57,6 +57,13 @@
             // The browser handles Esc for real full screen itself; this closes the CSS fallback.
             changed();
             clearMaximized();
+        } else if (open && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+            // Up / down go through the trades (the Trades page's full-screen review), when the element has such buttons.
+            const button = open.querySelector(event.key === 'ArrowUp' ? '[data-fullscreen-prev-trade]' : '[data-fullscreen-next-trade]');
+            if (button) {
+                event.preventDefault();
+                if (!button.disabled) button.click();
+            }
         } else if (open && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
             // Browse with the arrow keys while full screen: they press the element's own previous/next buttons.
             const button = open.querySelector(event.key === 'ArrowLeft' ? '[data-fullscreen-prev]' : '[data-fullscreen-next]');
