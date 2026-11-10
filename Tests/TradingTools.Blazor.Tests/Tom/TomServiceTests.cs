@@ -1,37 +1,34 @@
 using DataAccess.Data;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging.Abstractions;
-using Models;
 using Models.Tom;
-using Models.Trades;
-using NSubstitute;
-using SharedEnums.Enums;
-using TradingTools.Blazor.Services.Screenshots;
 using TradingTools.Blazor.Services.Tom;
 
 namespace TradingTools.Blazor.Tests.Tom
 {
-    /// <summary>The Tom section against an in-memory database and a real temp folder for the screenshots.</summary>
+    /// <summary>The Tom section against an in-memory database; the screenshots are in it too.</summary>
     public class TomServiceTests : IDisposable
     {
-        private readonly TempFolder _webRoot = new();
+        private readonly DbContextOptions<ApplicationDbContext> _options =
+            new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase($"tom-{Guid.NewGuid()}").Options;
         private readonly ApplicationDbContext _db;
         private readonly TomService _service;
 
         public TomServiceTests()
         {
-            _db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase($"tom-{Guid.NewGuid()}").Options);
-            var environment = Substitute.For<IWebHostEnvironment>();
-            environment.WebRootPath.Returns(_webRoot.Path);
-            _service = new TomService(_db, environment, new Ganss.Xss.HtmlSanitizer(), NullLogger<TomService>.Instance);
+            _db = new ApplicationDbContext(_options);
+            _service = new TomService(_db, new Ganss.Xss.HtmlSanitizer());
         }
 
-        public void Dispose()
+        public void Dispose() => _db.Dispose();
+
+        /// <summary>What is saved, read with a context of its own (not what the page's context still holds).</summary>
+        private async Task<List<(int TradeId, int Position, string FileName, string Image)>> SavedScreenshots()
         {
-            _db.Dispose();
-            _webRoot.Dispose();
+            await using var db = new ApplicationDbContext(_options);
+            return [.. (await db.Screenshots.AsNoTracking().Include(s => s.Content).ToListAsync())
+                .OrderBy(s => s.TomTradeId).ThenBy(s => s.Position)
+                .Select(s => (s.TomTradeId!.Value, s.Position, s.FileName, System.Text.Encoding.UTF8.GetString(s.Content!.Data)))];
         }
 
         private static IFormFile Png(string name, string content = "png")
@@ -130,16 +127,27 @@ namespace TradingTools.Blazor.Tests.Tom
         #region Trades and screenshots
 
         [Fact]
-        public async Task A_new_trade_saves_its_screenshots_in_its_own_folder_in_the_order_given()
+        public async Task A_new_trade_saves_its_screenshots_in_the_database_in_the_order_given()
         {
             var stream = await _service.CreateStreamAsync(Day, null, TomSession.EU, TomTrader.Tom);
 
-            var trade = await _service.AddTradeAsync(stream, [Png("b.png"), Png("a.png")]);
+            var trade = await _service.AddTradeAsync(stream, [Png("b.png", "B"), Png("a.png", "A")]);
 
-            string folder = $"Screenshots/Tom/Stream {stream.Id}/Trade {trade.Id}";
-            trade.ScreenshotsUrls.Should().Equal($"{folder}/b.png", $"{folder}/a.png");
-            (await _db.TomTrades.AsNoTracking().SingleAsync()).ScreenshotsUrls.Should().Equal($"{folder}/b.png", $"{folder}/a.png");
-            _webRoot.Files("Screenshots/Tom").Should().Equal($"Stream {stream.Id}/Trade {trade.Id}/a.png", $"Stream {stream.Id}/Trade {trade.Id}/b.png");
+            (await SavedScreenshots()).Should().Equal((trade.Id, 0, "b.png", "B"), (trade.Id, 1, "a.png", "A"));
+            trade.Screenshots.Select(s => s.FileName).Should().Equal("b.png", "a.png");
+            trade.ScreenshotsUrls.Should().BeEmpty("the old paths are no longer written");
+        }
+
+        [Fact]
+        public async Task The_page_keeps_the_screenshots_but_not_their_images()
+        {
+            var stream = await _service.CreateStreamAsync(Day, null, TomSession.EU, TomTrader.Tom);
+
+            var trade = await _service.AddTradeAsync(stream, [Png("a.png")]);
+
+            trade.Screenshots.Should().ContainSingle().Which.Content.Should().BeNull();
+            _db.ChangeTracker.Entries<Models.Screenshots.ScreenshotContent>().Should().BeEmpty();
+            (await SavedScreenshots()).Should().ContainSingle();
         }
 
         [Fact]
@@ -148,36 +156,45 @@ namespace TradingTools.Blazor.Tests.Tom
             var stream = await _service.CreateStreamAsync(Day, null, TomSession.EU, TomTrader.Tom);
             var trade = await _service.AddTradeAsync(stream, [Png("a.png")]);
 
-            await _service.AddScreenshotsAsync(stream, trade, [Png("b.png")]);
+            await _service.AddScreenshotsAsync(stream, trade, [Png("b.png"), Png("c.png")]);
 
-            (await _db.TomTrades.AsNoTracking().SingleAsync()).ScreenshotsUrls!.Select(Path.GetFileName).Should().Equal("a.png", "b.png");
+            (await SavedScreenshots()).Select(s => (s.Position, s.FileName)).Should().Equal((0, "a.png"), (1, "b.png"), (2, "c.png"));
+            trade.Screenshots.Select(s => s.FileName).Should().Equal("a.png", "b.png", "c.png");
         }
 
         [Fact]
-        public async Task A_screenshot_with_a_name_already_in_the_folder_does_not_overwrite_it()
+        public async Task Two_screenshots_with_the_same_name_are_both_kept()
         {
             var stream = await _service.CreateStreamAsync(Day, null, TomSession.EU, TomTrader.Tom);
             var trade = await _service.AddTradeAsync(stream, [Png("image.png", "first")]);
 
             await _service.AddScreenshotsAsync(stream, trade, [Png("image.png", "second")]);
 
-            trade.ScreenshotsUrls!.Select(Path.GetFileName).Should().Equal("image.png", "image (2).png");
-            File.ReadAllText(_webRoot[trade.ScreenshotsUrls![0]]).Should().Be("first");
-            File.ReadAllText(_webRoot[trade.ScreenshotsUrls![1]]).Should().Be("second");
+            (await SavedScreenshots()).Select(s => s.Image).Should().Equal("first", "second");
         }
 
         [Fact]
-        public async Task Deleting_a_screenshot_removes_its_path_and_its_file_only()
+        public async Task Deleting_a_screenshot_removes_that_one_only_and_the_others_keep_their_positions()
         {
             var stream = await _service.CreateStreamAsync(Day, null, TomSession.EU, TomTrader.Tom);
             var trade = await _service.AddTradeAsync(stream, [Png("a.png"), Png("b.png"), Png("c.png")]);
-            string b = trade.ScreenshotsUrls![1];
 
-            var outcome = await _service.DeleteScreenshotAsync(trade, b);
+            await _service.DeleteScreenshotAsync(trade, trade.Screenshots[1].Id);
 
-            outcome.Should().Be(ScreenshotFileOutcome.Deleted);
-            (await _db.TomTrades.AsNoTracking().SingleAsync()).ScreenshotsUrls!.Select(Path.GetFileName).Should().Equal("a.png", "c.png");
-            _webRoot.Files("Screenshots/Tom").Select(Path.GetFileName).Should().Equal("a.png", "c.png");
+            (await SavedScreenshots()).Select(s => (s.Position, s.FileName)).Should().Equal((0, "a.png"), (2, "c.png"));
+            trade.Screenshots.Select(s => s.FileName).Should().Equal("a.png", "c.png");
+        }
+
+        [Fact]
+        public async Task More_screenshots_after_a_deleted_one_go_after_the_last()
+        {
+            var stream = await _service.CreateStreamAsync(Day, null, TomSession.EU, TomTrader.Tom);
+            var trade = await _service.AddTradeAsync(stream, [Png("a.png"), Png("b.png")]);
+            await _service.DeleteScreenshotAsync(trade, trade.Screenshots[0].Id);
+
+            await _service.AddScreenshotsAsync(stream, trade, [Png("c.png")]);
+
+            (await SavedScreenshots()).Select(s => (s.Position, s.FileName)).Should().Equal((1, "b.png"), (2, "c.png"));
         }
 
         [Fact]
@@ -185,31 +202,16 @@ namespace TradingTools.Blazor.Tests.Tom
         {
             var stream = await _service.CreateStreamAsync(Day, null, TomSession.EU, TomTrader.Tom);
             var trade = await _service.AddTradeAsync(stream, [Png("a.png")]);
+            var other = await _service.AddTradeAsync(stream, [Png("other.png")]);
 
-            var act = () => _service.DeleteScreenshotAsync(trade, "Screenshots/Tom/elsewhere.png");
+            var act = () => _service.DeleteScreenshotAsync(trade, other.Screenshots[0].Id);
 
             await act.Should().ThrowAsync<InvalidOperationException>();
-            _webRoot.Files("Screenshots/Tom").Should().HaveCount(1);
+            (await SavedScreenshots()).Should().HaveCount(2);
         }
 
         [Fact]
-        public async Task A_file_a_trade_of_the_journal_also_uses_is_kept()
-        {
-            var stream = await _service.CreateStreamAsync(Day, null, TomSession.EU, TomTrader.Tom);
-            var trade = await _service.AddTradeAsync(stream, [Png("a.png")]);
-            string path = trade.ScreenshotsUrls![0];
-            _db.SampleSizes.Add(new SampleSize { Id = 1, SampleSizeType = SampleSizeType.DemoTrading, Strategy = Strategy.SRS, TimeFrame = TimeFrame.M15 });
-            _db.Add(new SRS { Id = 50, SampleSizeId = 1, ScreenshotsUrls = [path] });
-            await _db.SaveChangesAsync();
-
-            var outcome = await _service.DeleteScreenshotAsync(trade, path);
-
-            outcome.Should().Be(ScreenshotFileOutcome.KeptBecauseShared);
-            File.Exists(_webRoot[path]).Should().BeTrue();
-        }
-
-        [Fact]
-        public async Task Deleting_a_trade_deletes_its_files_and_leaves_the_other_trades_alone()
+        public async Task Deleting_a_trade_deletes_its_screenshots_and_leaves_the_other_trades_alone()
         {
             var stream = await _service.CreateStreamAsync(Day, null, TomSession.EU, TomTrader.Tom);
             var keep = await _service.AddTradeAsync(stream, [Png("keep.png")]);
@@ -219,11 +221,11 @@ namespace TradingTools.Blazor.Tests.Tom
 
             (await _db.TomTrades.AsNoTracking().Select(t => t.Id).ToListAsync()).Should().Equal(keep.Id);
             stream.Trades.Should().Equal(keep);
-            _webRoot.Files("Screenshots/Tom").Select(Path.GetFileName).Should().Equal("keep.png");
+            (await SavedScreenshots()).Select(s => s.FileName).Should().Equal("keep.png");
         }
 
         [Fact]
-        public async Task Deleting_a_stream_deletes_its_trades_and_their_files_but_not_other_streams()
+        public async Task Deleting_a_stream_deletes_its_trades_and_their_screenshots_but_not_other_streams()
         {
             var other = await _service.CreateStreamAsync(Day.AddDays(-1), null, TomSession.EU, TomTrader.Tom);
             await _service.AddTradeAsync(other, [Png("other.png")]);
@@ -235,41 +237,20 @@ namespace TradingTools.Blazor.Tests.Tom
 
             (await _db.TomStreams.AsNoTracking().Select(s => s.Id).ToListAsync()).Should().Equal(other.Id);
             (await _db.TomTrades.AsNoTracking().CountAsync()).Should().Be(1);
-            _webRoot.Files("Screenshots/Tom").Select(Path.GetFileName).Should().Equal("other.png");
+            (await SavedScreenshots()).Select(s => s.FileName).Should().Equal("other.png");
         }
 
         [Fact]
-        public async Task Deleting_a_stream_never_deletes_a_file_a_trade_of_the_journal_uses()
+        public async Task The_streams_come_with_their_trades_screenshots_in_carousel_order()
         {
             var stream = await _service.CreateStreamAsync(Day, null, TomSession.EU, TomTrader.Tom);
-            var trade = await _service.AddTradeAsync(stream, [Png("a.png")]);
-            string path = trade.ScreenshotsUrls![0];
-            _db.SampleSizes.Add(new SampleSize { Id = 1, SampleSizeType = SampleSizeType.DemoTrading, Strategy = Strategy.SRS, TimeFrame = TimeFrame.M15 });
-            _db.Add(new SRS { Id = 50, SampleSizeId = 1, ScreenshotsUrls = [path] });
-            await _db.SaveChangesAsync();
+            var trade = await _service.AddTradeAsync(stream, [Png("a.png"), Png("b.png"), Png("c.png")]);
 
-            await _service.DeleteStreamAsync(stream);
+            await using var db = new ApplicationDbContext(_options);
+            var streams = await new TomService(db, new Ganss.Xss.HtmlSanitizer()).GetStreamsAsync();
 
-            File.Exists(_webRoot[path]).Should().BeTrue();
-        }
-
-        [Fact]
-        public async Task Deleting_a_trade_of_the_journal_keeps_a_file_a_tom_trade_uses()
-        {
-            // The rule works both ways: the Trades page now also looks at the Tom trades.
-            var stream = await _service.CreateStreamAsync(Day, null, TomSession.EU, TomTrader.Tom);
-            var tomTrade = await _service.AddTradeAsync(stream, [Png("a.png")]);
-            string path = tomTrade.ScreenshotsUrls![0];
-            _db.SampleSizes.Add(new SampleSize { Id = 1, SampleSizeType = SampleSizeType.DemoTrading, Strategy = Strategy.SRS, TimeFrame = TimeFrame.M15 });
-            _db.Add(new SRS { Id = 50, SampleSizeId = 1, ScreenshotsUrls = [path] });
-            await _db.SaveChangesAsync();
-            var environment = Substitute.For<IWebHostEnvironment>();
-            environment.WebRootPath.Returns(_webRoot.Path);
-
-            var result = await new TradeScreenshotService(_db, environment, NullLogger<TradeScreenshotService>.Instance).DeleteAsync(50, path);
-
-            result.File.Should().Be(ScreenshotFileOutcome.KeptBecauseShared);
-            File.Exists(_webRoot[path]).Should().BeTrue();
+            streams.Single().Trades.Single().Screenshots.Select(s => s.FileName).Should().Equal("a.png", "b.png", "c.png");
+            streams.Single().Trades.Single().Screenshots.Should().OnlyContain(s => s.Content == null);
         }
 
         #endregion

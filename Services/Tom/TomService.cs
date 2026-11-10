@@ -26,34 +26,35 @@ namespace TradingTools.Blazor.Services.Tom
         /// <summary>More screenshots for a trade, after the ones it has.</summary>
         Task AddScreenshotsAsync(TomStream stream, TomTrade trade, IFormFile[] screenshots, CancellationToken cancellationToken = default);
 
-        /// <summary>One screenshot of a trade: its path, and its file unless something else still uses it.</summary>
-        /// <exception cref="InvalidOperationException">The trade has no screenshot with that path (nothing is changed).</exception>
-        Task<ScreenshotFileOutcome> DeleteScreenshotAsync(TomTrade trade, string path, CancellationToken cancellationToken = default);
+        /// <summary>One screenshot of a trade, with its image, found by its id.</summary>
+        /// <exception cref="InvalidOperationException">The trade has no such screenshot (nothing is changed).</exception>
+        Task DeleteScreenshotAsync(TomTrade trade, int screenshotId, CancellationToken cancellationToken = default);
 
-        /// <summary>A trade with its notes and its screenshot files.</summary>
+        /// <summary>A trade with its notes and its screenshots.</summary>
         Task DeleteTradeAsync(TomStream stream, TomTrade trade, CancellationToken cancellationToken = default);
 
-        /// <summary>A stream with its notes, its trades and their screenshot files.</summary>
+        /// <summary>A stream with its notes, its trades and their screenshots.</summary>
         Task DeleteStreamAsync(TomStream stream, CancellationToken cancellationToken = default);
     }
 
     /// <summary>
     /// The Tom section: streams of Tom and Andi (link, date, notes) and the trades they took in them (screenshots,
     /// notes). The page edits the tracked streams and trades directly; every save goes through here, so the notes are
-    /// always sanitized. Screenshots live in Screenshots/Tom/Stream n/Trade m/ and are deleted with the same rules as
-    /// on the Trades page (database first, only inside the Screenshots folder, never a file something else uses).
+    /// always sanitized. Screenshots are in the database, like the Trades page's, and go with their trade.
     /// </summary>
-    public class TomService(ApplicationDbContext db, IWebHostEnvironment environment, Ganss.Xss.IHtmlSanitizer sanitizer, ILogger<TomService> logger) : ITomService
+    public class TomService(ApplicationDbContext db, Ganss.Xss.IHtmlSanitizer sanitizer) : ITomService
     {
         private readonly ApplicationDbContext _db = db;
-        private readonly IWebHostEnvironment _environment = environment;
         private readonly Ganss.Xss.IHtmlSanitizer _sanitizer = sanitizer;
-        private readonly ILogger<TomService> _logger = logger;
 
         public async Task<List<TomStream>> GetStreamsAsync(CancellationToken cancellationToken = default)
         {
-            var streams = await _db.TomStreams.Include(s => s.Trades).ToListAsync(cancellationToken);
-            foreach (var stream in streams) stream.Trades.Sort((a, b) => a.Id.CompareTo(b.Id));
+            var streams = await _db.TomStreams.Include(s => s.Trades).ThenInclude(t => t.Screenshots).ToListAsync(cancellationToken);
+            foreach (var stream in streams)
+            {
+                stream.Trades.Sort((a, b) => a.Id.CompareTo(b.Id));
+                foreach (var trade in stream.Trades) TradeScreenshots.Sort(trade.Screenshots);
+            }
             return streams;
         }
 
@@ -84,81 +85,45 @@ namespace TradingTools.Blazor.Services.Tom
 
         public async Task<TomTrade> AddTradeAsync(TomStream stream, IFormFile[] screenshots, CancellationToken cancellationToken = default)
         {
-            // The trade is saved first: its folder is named after its id.
-            var trade = new TomTrade { TomStreamId = stream.Id };
+            // The trade and its screenshots are saved together.
+            var trade = new TomTrade { TomStreamId = stream.Id, Screenshots = await TradeScreenshots.FromFilesAsync(screenshots, firstPosition: 0, cancellationToken) };
             stream.Trades.Add(trade);
             await SaveTrackedAsync(cancellationToken);
-
-            trade.ScreenshotsUrls = await ScreenshotStorage.SaveFilesToFolderAsync(_environment.WebRootPath, FolderOf(stream, trade), screenshots);
-            await SaveTrackedAsync(cancellationToken);
+            TradeScreenshots.ReleaseImages(_db, trade.Screenshots);
             return trade;
         }
 
         public async Task AddScreenshotsAsync(TomStream stream, TomTrade trade, IFormFile[] screenshots, CancellationToken cancellationToken = default)
         {
-            var paths = await ScreenshotStorage.SaveFilesToFolderAsync(_environment.WebRootPath, FolderOf(stream, trade), screenshots);
-            trade.ScreenshotsUrls = [.. trade.ScreenshotsUrls ?? [], .. paths];
+            var added = await TradeScreenshots.FromFilesAsync(screenshots, TradeScreenshots.NextPosition(trade.Screenshots), cancellationToken);
+            trade.Screenshots.AddRange(added);
             await SaveTrackedAsync(cancellationToken);
+            TradeScreenshots.ReleaseImages(_db, added);
         }
 
-        public async Task<ScreenshotFileOutcome> DeleteScreenshotAsync(TomTrade trade, string path, CancellationToken cancellationToken = default)
+        public async Task DeleteScreenshotAsync(TomTrade trade, int screenshotId, CancellationToken cancellationToken = default)
         {
-            var urls = trade.ScreenshotsUrls ?? [];
-            int index = urls.FindIndex(url => string.Equals(url, path, StringComparison.Ordinal));
-            if (index < 0) throw new InvalidOperationException("This screenshot is no longer part of the trade.");
+            var screenshot = trade.Screenshots.FirstOrDefault(s => s.Id == screenshotId)
+                ?? throw new InvalidOperationException("This screenshot is no longer part of the trade.");
 
-            string key = ScreenshotFiles.Key(path);
-            bool shared = urls.Where((_, i) => i != index).Any(url => ScreenshotFiles.SameFile(url, key))
-                || await ScreenshotFiles.IsUsedElsewhereAsync(_db, path, exceptTomTradeId: trade.Id, cancellationToken: cancellationToken);
-
-            // The database first: if this fails nothing has been touched.
-            trade.ScreenshotsUrls = [.. urls.Where((_, i) => i != index)];
+            // Its image goes with it (the database deletes it).
+            trade.Screenshots.Remove(screenshot);
+            _db.Screenshots.Remove(screenshot);
             await SaveTrackedAsync(cancellationToken);
-
-            return ScreenshotFiles.Delete(ScreenshotFiles.ResolveFile(_environment.WebRootPath, path), shared, _logger);
         }
 
         public async Task DeleteTradeAsync(TomStream stream, TomTrade trade, CancellationToken cancellationToken = default)
         {
-            var files = await FilesToDeleteAsync(trade.ScreenshotsUrls ?? [], [trade.Id], cancellationToken);
-
             stream.Trades.Remove(trade);
-            _db.TomTrades.Remove(trade);
+            _db.TomTrades.Remove(trade); // its screenshots go with it
             await SaveTrackedAsync(cancellationToken);
-
-            DeleteFiles(files);
         }
 
         public async Task DeleteStreamAsync(TomStream stream, CancellationToken cancellationToken = default)
         {
-            var files = await FilesToDeleteAsync(
-                [.. stream.Trades.SelectMany(t => t.ScreenshotsUrls ?? [])], [.. stream.Trades.Select(t => t.Id)], cancellationToken);
-
-            _db.TomStreams.Remove(stream); // its trades go with it
+            _db.TomStreams.Remove(stream); // its trades and their screenshots go with it
             await SaveTrackedAsync(cancellationToken);
-
-            DeleteFiles(files);
         }
-
-        /// <summary>The files of these paths, each with whether something outside the given Tom trades still uses it.</summary>
-        private async Task<List<(string? File, bool Shared)>> FilesToDeleteAsync(IEnumerable<string> paths, IReadOnlyCollection<int> tomTradeIds, CancellationToken cancellationToken)
-        {
-            var files = new List<(string? File, bool Shared)>();
-            foreach (var path in paths.Distinct(StringComparer.OrdinalIgnoreCase))
-            {
-                bool shared = await ScreenshotFiles.IsUsedElsewhereAsync(_db, path, null, tomTradeIds, cancellationToken);
-                files.Add((ScreenshotFiles.ResolveFile(_environment.WebRootPath, path), shared));
-            }
-            return files;
-        }
-
-        private void DeleteFiles(IEnumerable<(string? File, bool Shared)> files)
-        {
-            foreach (var (file, shared) in files) ScreenshotFiles.Delete(file, shared, _logger);
-        }
-
-        private string FolderOf(TomStream stream, TomTrade trade) =>
-            Path.Combine(ScreenshotStorage.GetRoot(_environment.WebRootPath), "Tom", $"Stream {stream.Id}", $"Trade {trade.Id}");
 
         /// <summary>Saves, with the notes sanitized (they are HTML from the editor) and the short fields trimmed.</summary>
         private async Task SaveTrackedAsync(CancellationToken cancellationToken)

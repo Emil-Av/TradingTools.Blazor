@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @using Models.Tom
 @using TradingTools.Blazor.Services.Tom
+@using TradingTools.Blazor.Services.Screenshots
 @using TradingTools.Blazor.Services.Reviews
 
 <MudProviders />
@@ -191,11 +192,11 @@
 
                         @if (CurrentTrade is { } trade)
                         {
-                            @if (trade.ScreenshotsUrls is { Count: > 0 } urls)
+                            @if (trade.Screenshots is { Count: > 0 } shots)
                             {
                                 @* Same carousel as the Trades page (styles in app.css, full screen in fullscreen.js). *@
                                 <div class="app-carousel" data-fullscreen>
-                                    <img class="app-carousel-img" src="@("/" + urls[_screenshotIndex])" alt="Screenshot @(_screenshotIndex + 1) of @urls.Count" />
+                                    <img class="app-carousel-img" src="@TradeScreenshots.Url(shots[Math.Min(_screenshotIndex, shots.Count - 1)])" alt="Screenshot @(_screenshotIndex + 1) of @shots.Count" />
                                     <button type="button" class="app-carousel-btn app-carousel-fs" onclick="appFullscreen.toggle(this)" title="Full screen (Esc to close)" aria-label="Toggle full screen">
                                         <svg class="app-fs-enter" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
                                         <svg class="app-fs-exit" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /></svg>
@@ -203,11 +204,11 @@
                                     <button type="button" class="app-carousel-btn app-carousel-del" title="Delete this screenshot" aria-label="Delete this screenshot" disabled="@_busy" @onclick="ConfirmDeleteScreenshotAsync">
                                         <MudIcon Icon="@Icons.Material.Filled.DeleteOutline" Size="Size.Small" />
                                     </button>
-                                    @if (urls.Count > 1)
+                                    @if (shots.Count > 1)
                                     {
                                         <button class="app-carousel-btn" style="left:14px;" data-fullscreen-prev aria-label="Previous screenshot" @onclick="PrevScreenshot"><MudIcon Icon="@Icons.Material.Filled.ChevronLeft" /></button>
                                         <button class="app-carousel-btn" style="right:14px;" data-fullscreen-next aria-label="Next screenshot" @onclick="NextScreenshot"><MudIcon Icon="@Icons.Material.Filled.ChevronRight" /></button>
-                                        <div style="position:absolute; bottom:10px; left:0; right:0; text-align:center; color:white; font-size:11px; text-shadow:0 1px 2px black;">@(_screenshotIndex + 1) / @urls.Count</div>
+                                        <div style="position:absolute; bottom:10px; left:0; right:0; text-align:center; color:white; font-size:11px; text-shadow:0 1px 2px black;">@(_screenshotIndex + 1) / @shots.Count</div>
                                     }
                                 </div>
                             }

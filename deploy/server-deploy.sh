@@ -61,7 +61,9 @@ ln -sfn "$RELEASE" "$APP/current.new" && mv -Tf "$APP/current.new" "$APP/current
 systemctl restart "$SERVICE"
 
 healthy=false
-for _ in $(seq 1 30); do
+# Up to 5 minutes: a start can include one-time work before the site answers (migrations, moving the
+# screenshots into the database once - about a minute for ~700 MB).
+for _ in $(seq 1 150); do
     sleep 2
     code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/account/login" || true)
     if [ "$code" = "200" ]; then healthy=true; break; fi

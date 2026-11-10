@@ -72,6 +72,7 @@ namespace TradingTools.Blazor.Services.DataBackup
             IDatabaseBackup backup,
             IDbContextFactory dbContextFactory,
             LegacyScreenshotMigration screenshotMigration,
+            ScreenshotDatabaseImport screenshotImport,
             ITradeValidationMonitor validation,
             CancellationToken cancellationToken)
         {
@@ -112,7 +113,22 @@ namespace TradingTools.Blazor.Services.DataBackup
             await screenshotMigration.RunAsync(cancellationToken);
             validation.RequestValidation();
 
-            return BackToPage(message: $"Database imported from {Path.GetFileName(file.FileName)}.");
+            // A dump from before the screenshots moved into the database has only their paths: the files are read from
+            // the Screenshots folder now (import that folder's zip first). A newer dump has the screenshots in it.
+            string screenshots;
+            try
+            {
+                var result = await screenshotImport.RunAsync(cancellationToken);
+                screenshots = !result.Ran ? ""
+                    : result.MissingPaths.Count == 0 ? $" {result.Imported} screenshot(s) moved from the Screenshots folder into the database."
+                    : $" {result.Imported} screenshot(s) moved from the Screenshots folder into the database; {result.MissingPaths.Count} were not found there (see the log).";
+            }
+            catch (Exception ex)
+            {
+                return BackToPage(error: $"The database was imported, but moving its screenshots into it failed, nothing of them was moved: {ex.Message}");
+            }
+
+            return BackToPage(message: $"Database imported from {Path.GetFileName(file.FileName)}.{screenshots}");
         }
 
         private static IResult ImportScreenshots(IFormFile? file, IWebHostEnvironment environment)

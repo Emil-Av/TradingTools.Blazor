@@ -476,7 +476,7 @@ namespace TradingTools.Blazor.Components.Pages
         }
 
         private void PrevScreenshot() { if (_screenshotIndex > 0) _screenshotIndex--; }
-        private void NextScreenshot() { if (CurrentBase?.ScreenshotsUrls is { } urls && _screenshotIndex < urls.Count - 1) _screenshotIndex++; }
+        private void NextScreenshot() { if (CurrentBase?.Screenshots is { } shots && _screenshotIndex < shots.Count - 1) _screenshotIndex++; }
 
         private async Task PrevSampleSize()
         {
@@ -628,8 +628,12 @@ namespace TradingTools.Blazor.Components.Pages
                 // Uploaded, saved and shown by date, the oldest first - like on the New Trade page (they follow the screenshots already there).
                 var files = ScreenshotOrder.OldestFirst(e.GetMultipleFiles(20));
                 var formFiles = await Task.WhenAll(files.Select(f => BrowserFileFormFile.CreateAsync(f, MaxFileSizeBytes)));
-                var updatedUrls = await TradesService.UploadScreenshotsAsync(CurrentBase.Id, formFiles.Cast<Microsoft.AspNetCore.Http.IFormFile>().ToArray());
-                CurrentBase.ScreenshotsUrls = updatedUrls;
+                var trade = CurrentBase;
+                var added = await TradesService.UploadScreenshotsAsync(trade.Id, formFiles.Cast<Microsoft.AspNetCore.Http.IFormFile>().ToArray());
+                // The trade is tracked, so they may already be in its list; never twice.
+                foreach (var screenshot in added)
+                    if (!trade.Screenshots.Any(s => s.Id == screenshot.Id)) trade.Screenshots.Add(screenshot);
+                TradeScreenshots.Sort(trade.Screenshots);
                 Snackbar.Add("Screenshots uploaded.", Severity.Success);
             }
             catch (Exception ex)
@@ -643,21 +647,20 @@ namespace TradingTools.Blazor.Components.Pages
         }
 
         /// <summary>
-        /// Deletes the screenshot on show - its path from the trade and its file from the Screenshots folder - after
-        /// asking. The screenshot is identified by its path, taken before the dialog opens.
+        /// Deletes the screenshot on show, with its image, after asking. The screenshot is identified by its id, taken
+        /// before the dialog opens.
         /// </summary>
         private async Task ConfirmDeleteScreenshotAsync()
         {
-            if (CurrentBase?.ScreenshotsUrls is not { } urls || _screenshotIndex < 0 || _screenshotIndex >= urls.Count) return;
+            if (CurrentBase is not { } trade || _screenshotIndex < 0 || _screenshotIndex >= trade.Screenshots.Count) return;
 
-            int tradeId = CurrentBase.Id;
             int position = _screenshotIndex;
-            string path = urls[position];
-            string name = Path.GetFileName(path.Replace('\\', '/'));
+            int count = trade.Screenshots.Count;
+            var screenshot = trade.Screenshots[position];
 
             bool? confirmed = await DialogService.ShowMessageBoxAsync(
-                $"Delete screenshot {position + 1} of {urls.Count}?",
-                $"{name} is removed from this trade and deleted from the Screenshots folder. This cannot be undone.",
+                $"Delete screenshot {position + 1} of {count}?",
+                $"{screenshot.FileName} is deleted from this trade. This cannot be undone.",
                 yesText: "Delete", cancelText: "Cancel");
 
             if (confirmed != true) return;
@@ -665,33 +668,14 @@ namespace TradingTools.Blazor.Components.Pages
             _saving = true;
             try
             {
-                var result = await ScreenshotService.DeleteAsync(tradeId, path);
+                await ScreenshotService.DeleteAsync(trade.Id, screenshot.Id);
 
+                trade.Screenshots.RemoveAll(s => s.Id == screenshot.Id);
                 // Only the trade that was on show is updated on screen (it is the one the screenshot belonged to).
-                if (CurrentBase is not null && CurrentBase.Id == tradeId)
-                {
-                    CurrentBase.ScreenshotsUrls = result.Urls;
-                    _screenshotIndex = Math.Max(0, Math.Min(position, result.Urls.Count - 1));
-                }
+                if (CurrentBase?.Id == trade.Id)
+                    _screenshotIndex = Math.Max(0, Math.Min(position, trade.Screenshots.Count - 1));
 
-                switch (result.File)
-                {
-                    case ScreenshotFileOutcome.Deleted:
-                        Snackbar.Add("Screenshot deleted.", Severity.Success);
-                        break;
-                    case ScreenshotFileOutcome.WasMissing:
-                        Snackbar.Add("Screenshot removed (its file was already gone).", Severity.Success);
-                        break;
-                    case ScreenshotFileOutcome.KeptBecauseShared:
-                        Snackbar.Add("Screenshot removed from this trade. Its file is kept because another trade uses it.", Severity.Info);
-                        break;
-                    case ScreenshotFileOutcome.NotInScreenshotsFolder:
-                        Snackbar.Add("Screenshot removed from this trade. Its file is outside the Screenshots folder, so it was not touched.", Severity.Warning);
-                        break;
-                    default:
-                        Snackbar.Add("Screenshot removed from this trade, but its file could not be deleted.", Severity.Warning);
-                        break;
-                }
+                Snackbar.Add("Screenshot deleted.", Severity.Success);
             }
             catch (Exception ex)
             {

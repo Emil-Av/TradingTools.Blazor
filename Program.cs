@@ -71,6 +71,7 @@ var app = builder.Build();
 ApplyMigrations(app);
 ApplySymbolDataFix(app);
 MigrateLegacyScreenshots(app);
+ImportScreenshotsIntoDatabase(app);
 
 // First, so everything after it (HTTPS redirection, cookies, antiforgery) sees https behind nginx.
 app.UseForwardedHeaders();
@@ -84,9 +85,18 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// Uploaded screenshots are written into wwwroot at runtime, after the build-time static asset
-// manifest is generated, so they need the classic file-system-backed static file middleware —
-// MapStaticAssets() alone only knows about files that existed at build/publish time.
+// The screenshots are in the database and served after login (/screenshot/{id}). The old Screenshots folder is
+// still in wwwroot (kept untouched as a backup), so it is closed here: never served to anyone.
+app.Use((context, next) =>
+{
+    if (!context.Request.Path.StartsWithSegments("/" + ScreenshotStorage.RootFolderName, StringComparison.OrdinalIgnoreCase)
+        && !context.Request.Path.StartsWithSegments("/" + ScreenshotStorage.LegacyRootFolderName, StringComparison.OrdinalIgnoreCase))
+        return next();
+
+    context.Response.StatusCode = StatusCodes.Status404NotFound;
+    return Task.CompletedTask;
+});
+
 app.UseStaticFiles();
 
 app.UseAuthentication();
@@ -99,6 +109,7 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.MapBackupEndpoints();
+app.MapScreenshotEndpoints();
 
 // Plain GET+POST endpoints (not a Razor component) so the topbar's account menu can log out with a
 // real <form> post, exactly like the Razor Pages app's /Account/Logout page did.
@@ -198,6 +209,24 @@ static void MigrateLegacyScreenshots(WebApplication app)
     }
 }
 
+// Moves the screenshots from the Screenshots folder into the database, once (see ScreenshotDatabaseImport). A
+// failure stops the app, like a failed migration: the import is all or nothing, so nothing is half done, and on the
+// VPS the deploy then switches back to the previous release.
+static void ImportScreenshotsIntoDatabase(WebApplication app)
+{
+    using var scope = app.Services.CreateScope();
+    try
+    {
+        scope.ServiceProvider.GetRequiredService<ScreenshotDatabaseImport>().RunAsync().GetAwaiter().GetResult();
+    }
+    catch (Exception ex)
+    {
+        scope.ServiceProvider.GetRequiredService<ILogger<Program>>()
+            .LogError(ex, "Moving the screenshots into the database failed; nothing was imported.");
+        throw;
+    }
+}
+
 static void ConfigureIdentity(WebApplicationBuilder builder)
 {
     builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
@@ -255,6 +284,7 @@ static void AddServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<TradeValidationWorker>();
 
     builder.Services.AddScoped<LegacyScreenshotMigration>();
+    builder.Services.AddScoped<ScreenshotDatabaseImport>();
     builder.Services.AddSingleton<IDatabaseBackup, PostgresDatabaseBackup>();
 
     // Journal/Review text is stored as HTML from the rich text editor - sanitized before saving.

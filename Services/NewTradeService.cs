@@ -20,27 +20,39 @@ namespace TradingTools.Blazor.Services
         private readonly ITradeValidationMonitor _validationMonitor;
         private NewTradeVM _viewModel = null!;
         private IFormFile[] _files = null!;
+        private List<Models.Screenshots.Screenshot> _newScreenshots = [];
+        private readonly DataAccess.Data.ApplicationDbContext _db;
 
-        public NewTradeService(IUnitOfWork unitOfWork, IWebHostEnvironment webHostEnvironment, ITradeValidationMonitor validationMonitor)
+        public NewTradeService(IUnitOfWork unitOfWork, IWebHostEnvironment webHostEnvironment, ITradeValidationMonitor validationMonitor, DataAccess.Data.ApplicationDbContext db)
         {
             _unitOfWork = unitOfWork;
             _webHostEnvironment = webHostEnvironment;
             _validationMonitor = validationMonitor;
+            _db = db;
         }
 
         public async Task SaveTradeAsync(NewTradeVM viewModel, IFormFile[] files)
         {
             _viewModel = viewModel;
             _files = files;
+            _newScreenshots = [];
 
-            if (_viewModel.SampleSizeViewData.SampleSizeType == SampleSizeType.Research)
+            try
             {
-                await SaveResearchTradeAsync();
+                if (_viewModel.SampleSizeViewData.SampleSizeType == SampleSizeType.Research)
+                {
+                    await SaveResearchTradeAsync();
+                }
+                else
+                {
+                    await SaveTradeAsync();
+                    _validationMonitor.RequestValidation();
+                }
             }
-            else
+            finally
             {
-                await SaveTradeAsync();
-                _validationMonitor.RequestValidation();
+                // The trade's screenshots are saved with it (in the database); their images aren't kept in memory.
+                TradeScreenshots.ReleaseImages(_db, _newScreenshots);
             }
         }
 
@@ -85,7 +97,8 @@ namespace TradingTools.Blazor.Services
                 var (sampleSizeId, isFull) = await ProcessSampleSize(maxTradesProSampleSize: 20, _viewModel.EspressoTrade.IsFlippedTheSwitch);
                 _viewModel.EspressoTrade.SampleSizeId = sampleSizeId;
                 _viewModel.EspressoTrade.JournalId = await CreateJournal();
-                _viewModel.EspressoTrade.ScreenshotsUrls = await ScreenshotStorage.SaveFilesAsync(_webHostEnvironment.WebRootPath, _viewModel, _viewModel.EspressoTrade, _files, isFull);
+                _viewModel.EspressoTrade.Screenshots = await TradeScreenshots.FromFilesAsync(_files, firstPosition: 0);
+                _newScreenshots = _viewModel.EspressoTrade.Screenshots;
 
                 _unitOfWork.Espresso.Add(_viewModel.EspressoTrade);
                 await _unitOfWork.SaveAsync();
@@ -103,7 +116,8 @@ namespace TradingTools.Blazor.Services
                 var (sampleSizeId, isFull) = await ProcessSampleSize(maxTradesProSampleSize: 20, _viewModel.BrunchBreakTrade.IsFlippedTheSwitch);
                 _viewModel.BrunchBreakTrade.SampleSizeId = sampleSizeId;
                 _viewModel.BrunchBreakTrade.JournalId = await CreateJournal();
-                _viewModel.BrunchBreakTrade.ScreenshotsUrls = await ScreenshotStorage.SaveFilesAsync(_webHostEnvironment.WebRootPath, _viewModel, _viewModel.BrunchBreakTrade, _files, isFull);
+                _viewModel.BrunchBreakTrade.Screenshots = await TradeScreenshots.FromFilesAsync(_files, firstPosition: 0);
+                _newScreenshots = _viewModel.BrunchBreakTrade.Screenshots;
 
                 _unitOfWork.BrunchBreak.Add(_viewModel.BrunchBreakTrade);
                 await _unitOfWork.SaveAsync();
@@ -121,7 +135,8 @@ namespace TradingTools.Blazor.Services
                 var (sampleSizeId, isFull) = await ProcessSampleSize(maxTradesProSampleSize: 20, _viewModel.SRSTrade.IsFlippedTheSwitch);
                 _viewModel.SRSTrade.SampleSizeId = sampleSizeId;
                 _viewModel.SRSTrade.JournalId = await CreateJournal();
-                _viewModel.SRSTrade.ScreenshotsUrls = await ScreenshotStorage.SaveFilesAsync(_webHostEnvironment.WebRootPath, _viewModel, _viewModel.SRSTrade, _files, isFull);
+                _viewModel.SRSTrade.Screenshots = await TradeScreenshots.FromFilesAsync(_files, firstPosition: 0);
+                _newScreenshots = _viewModel.SRSTrade.Screenshots;
 
                 _unitOfWork.SRS.Add(_viewModel.SRSTrade);
                 await _unitOfWork.SaveAsync();
@@ -151,7 +166,8 @@ namespace TradingTools.Blazor.Services
             var researchData = new ResearchCandleBracketing();
             EntityMapper.ViewModelToEntity(researchData, viewData);
             researchData.SampleSizeId = sampleSizeData.id;
-            researchData.ScreenshotsUrls = await ScreenshotStorage.SaveFilesAsync(_webHostEnvironment.WebRootPath, _viewModel, viewData, _files, sampleSizeData.isFull);
+            researchData.Screenshots = await TradeScreenshots.FromFilesAsync(_files, firstPosition: 0);
+            _newScreenshots = researchData.Screenshots;
 
             _unitOfWork.ResearchCandleBracketing.Add(researchData);
             try
@@ -173,7 +189,8 @@ namespace TradingTools.Blazor.Services
             var researchData = new ResearchCradle();
             EntityMapper.ViewModelToEntity(researchData, viewData);
             researchData.SampleSizeId = sampleSizeData.id;
-            researchData.ScreenshotsUrls = await ScreenshotStorage.SaveFilesAsync(_webHostEnvironment.WebRootPath, _viewModel, viewData, _files, sampleSizeData.isFull);
+            researchData.Screenshots = await TradeScreenshots.FromFilesAsync(_files, firstPosition: 0);
+            _newScreenshots = researchData.Screenshots;
 
             _unitOfWork.ResearchCradle.Add(researchData);
             await _unitOfWork.SaveAsync();
@@ -189,7 +206,8 @@ namespace TradingTools.Blazor.Services
             var sampleSizeData = await ProcessSampleSize(maxTradesProSampleSize);
             researchData.SampleSizeId = sampleSizeData.id;
 
-            researchData.ScreenshotsUrls = await ScreenshotStorage.SaveFilesAsync(_webHostEnvironment.WebRootPath, _viewModel, researchData, _files, sampleSizeData.isFull);
+            researchData.Screenshots = await TradeScreenshots.FromFilesAsync(_files, firstPosition: 0);
+            _newScreenshots = researchData.Screenshots;
 
             _unitOfWork.ResearchFirstBarPullback.Add(researchData);
             await _unitOfWork.SaveAsync();

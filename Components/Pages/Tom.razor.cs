@@ -149,7 +149,7 @@ namespace TradingTools.Blazor.Components.Pages
 
         private void PrevScreenshot() { if (_screenshotIndex > 0) _screenshotIndex--; }
 
-        private void NextScreenshot() { if (CurrentTrade?.ScreenshotsUrls is { } urls && _screenshotIndex < urls.Count - 1) _screenshotIndex++; }
+        private void NextScreenshot() { if (CurrentTrade?.Screenshots is { } shots && _screenshotIndex < shots.Count - 1) _screenshotIndex++; }
 
         private string TimeText => _timeDraft ?? (CurrentTrade?.VideoSeconds is { } s ? VideoTime.Format(s) : "");
 
@@ -226,32 +226,26 @@ namespace TradingTools.Blazor.Components.Pages
             }, "deleting the trade");
         }
 
-        /// <summary>The screenshot on show: identified by its path, taken before the dialog opens.</summary>
+        /// <summary>The screenshot on show: identified by its id, taken before the dialog opens.</summary>
         private async Task ConfirmDeleteScreenshotAsync()
         {
-            if (CurrentTrade is not { ScreenshotsUrls: { } urls } trade || _screenshotIndex < 0 || _screenshotIndex >= urls.Count) return;
+            if (CurrentTrade is not { } trade || _screenshotIndex < 0 || _screenshotIndex >= trade.Screenshots.Count) return;
 
             int position = _screenshotIndex;
-            string path = urls[position];
-            string name = Path.GetFileName(path.Replace('\\', '/'));
+            int count = trade.Screenshots.Count;
+            var screenshot = trade.Screenshots[position];
 
             bool? confirmed = await DialogService.ShowMessageBoxAsync(
-                $"Delete screenshot {position + 1} of {urls.Count}?",
-                $"{name} is removed from this trade and deleted from the Screenshots folder. This cannot be undone.",
+                $"Delete screenshot {position + 1} of {count}?",
+                $"{screenshot.FileName} is deleted from this trade. This cannot be undone.",
                 yesText: "Delete", cancelText: "Cancel");
             if (confirmed != true) return;
 
             await RunAsync(async () =>
             {
-                var outcome = await TomService.DeleteScreenshotAsync(trade, path);
-                _screenshotIndex = Math.Max(0, Math.Min(position, (trade.ScreenshotsUrls?.Count ?? 0) - 1));
-                Snackbar.Add(outcome switch
-                {
-                    ScreenshotFileOutcome.Deleted => "Screenshot deleted.",
-                    ScreenshotFileOutcome.WasMissing => "Screenshot removed (its file was already gone).",
-                    ScreenshotFileOutcome.KeptBecauseShared => "Screenshot removed from this trade. Its file is kept because another trade uses it.",
-                    _ => "Screenshot removed from this trade, but its file could not be deleted."
-                }, outcome is ScreenshotFileOutcome.Deleted or ScreenshotFileOutcome.WasMissing ? Severity.Success : Severity.Warning);
+                await TomService.DeleteScreenshotAsync(trade, screenshot.Id);
+                _screenshotIndex = Math.Max(0, Math.Min(position, trade.Screenshots.Count - 1));
+                Snackbar.Add("Screenshot deleted.", Severity.Success);
             }, "deleting the screenshot");
         }
 

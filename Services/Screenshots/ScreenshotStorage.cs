@@ -1,135 +1,17 @@
-using System.Text.RegularExpressions;
-using Microsoft.AspNetCore.Http;
-using Models.ViewModels;
-using Shared;
-using SharedEnums.Enums;
-
 namespace TradingTools.Blazor.Services.Screenshots
 {
     /// <summary>
-    /// Where screenshots live on disk and how new trades' files are stored.
-    ///
-    /// There is a single root, wwwroot/Screenshots, in every environment. The old "ScreenshotsDev"
-    /// root (used when the app only ran locally) is merged into it at startup by
-    /// <see cref="LegacyScreenshotMigration"/>. Paths stored in the database are relative to wwwroot,
-    /// with forward slashes, e.g. "Screenshots/Demo Trading/SRS/15M/Sample Size 3/Trade 7/chart.png".
+    /// The old Screenshots folder, wwwroot/Screenshots, from before the screenshots moved into the database. Nothing is
+    /// written there any more; it is kept as it was (and never served, see Program.cs) and read once, by
+    /// <see cref="ScreenshotDatabaseImport"/>. The older "ScreenshotsDev" root is merged into it at startup by
+    /// <see cref="LegacyScreenshotMigration"/>. The old paths in the database are relative to wwwroot, with forward
+    /// slashes, e.g. "Screenshots/Demo Trading/SRS/15M/Sample Size 3/Trade 7/chart.png".
     /// </summary>
-    public static partial class ScreenshotStorage
+    public static class ScreenshotStorage
     {
         public const string RootFolderName = "Screenshots";
         public const string LegacyRootFolderName = "ScreenshotsDev";
 
         public static string GetRoot(string webRootPath) => Path.Combine(webRootPath, RootFolderName);
-
-        /// <summary>
-        /// Saves a new trade's screenshots under
-        /// Screenshots/{type}/{strategy class}/{timeframe}/Sample Size n/Trade m/ and returns their
-        /// database paths.
-        /// </summary>
-        /// <param name="newTrade">The trade or research entity; its class name is the strategy folder (SRS, Espresso, ResearchCradle, ...).</param>
-        /// <param name="isSampleSizeFull">True when the trade starts a new sample size.</param>
-        public static async Task<List<string>> SaveFilesAsync(string webRootPath, NewTradeVM viewModel, object newTrade, IFormFile[] files, bool isSampleSizeFull)
-        {
-            string strategyFolder = Path.Combine(
-                GetRoot(webRootPath),
-                MyEnumConverter.TradeTypeFromEnum(viewModel.SampleSizeViewData.SampleSizeType),
-                newTrade.GetType().Name,
-                MyEnumConverter.TimeFrameFromEnum(viewModel.SampleSizeViewData.TimeFrame));
-            Directory.CreateDirectory(strategyFolder);
-
-            string tradeFolder = NextTradeFolder(strategyFolder, isSampleSizeFull);
-            return await SaveFilesToFolderAsync(webRootPath, tradeFolder, files);
-        }
-
-        /// <summary>Where a trade's own folder by id goes, next to the sample size folders. Its name has no number, so it never counts as a sample size.</summary>
-        public const string ByTradeIdFolderName = "By trade id";
-
-        /// <summary>
-        /// The folder for new screenshots of a trade that has none left: once its last screenshot is deleted, the folder
-        /// it was in is no longer known. So it gets its own folder by trade id, e.g.
-        /// Screenshots/Demo Trading/SRS/15M/By trade id/Trade 5197.
-        /// </summary>
-        /// <param name="strategyFolderName">The trade's class name, as for new trades (SRS, Espresso, ...).</param>
-        public static string FolderByTradeId(string webRootPath, SampleSizeType sampleSizeType, string strategyFolderName, TimeFrame timeFrame, int tradeId) =>
-            Path.Combine(
-                GetRoot(webRootPath),
-                MyEnumConverter.TradeTypeFromEnum(sampleSizeType),
-                strategyFolderName,
-                MyEnumConverter.TimeFrameFromEnum(timeFrame),
-                ByTradeIdFolderName,
-                $"Trade {tradeId}");
-
-        /// <summary>
-        /// The folder for the next trade: a new "Trade n" in the latest sample size, or "Sample Size n+1/Trade 1"
-        /// when that sample size is full. Sample size folders are ordered by their number, not their name
-        /// ("Sample Size 10" sorts before "Sample Size 9" as text).
-        /// </summary>
-        internal static string NextTradeFolder(string strategyFolder, bool isSampleSizeFull)
-        {
-            var sampleSizeFolders = NumberedFolders(strategyFolder, "Sample Size");
-
-            string sampleSizeFolder;
-            if (sampleSizeFolders.Count == 0)
-                sampleSizeFolder = Path.Combine(strategyFolder, "Sample Size 1");
-            else if (isSampleSizeFull)
-                sampleSizeFolder = Path.Combine(strategyFolder, $"Sample Size {sampleSizeFolders[^1].Number + 1}");
-            else
-                sampleSizeFolder = sampleSizeFolders[^1].Path;
-
-            var tradeFolders = Directory.Exists(sampleSizeFolder) ? NumberedFolders(sampleSizeFolder, "Trade") : [];
-            int nextTrade = tradeFolders.Count == 0 ? 1 : tradeFolders[^1].Number + 1;
-
-            string tradeFolder = Path.Combine(sampleSizeFolder, $"Trade {nextTrade}");
-            Directory.CreateDirectory(tradeFolder);
-            return tradeFolder;
-        }
-
-        /// <summary>Writes the files into <paramref name="folder"/> and returns their database paths (relative to wwwroot, forward slashes).</summary>
-        public static async Task<List<string>> SaveFilesToFolderAsync(string webRootPath, string folder, IFormFile[] files)
-        {
-            Directory.CreateDirectory(folder);
-            var paths = new List<string>();
-
-            foreach (var file in files)
-            {
-                // The browser-supplied name can contain '/' or '\' whatever the server's OS; keep only
-                // the file name so nothing is written outside the folder. A file that is already there is never
-                // overwritten (two pasted screenshots are often both "image.png"): the new one gets a free name.
-                string filePath = FreePath(folder, Path.GetFileName(file.FileName));
-
-                await using (var stream = new FileStream(filePath, FileMode.CreateNew))
-                {
-                    await file.CopyToAsync(stream);
-                }
-
-                paths.Add(ToDatabasePath(webRootPath, filePath));
-            }
-
-            return paths;
-        }
-
-        /// <summary>"name.png", or "name (2).png", "name (3).png", ... when that name is taken in the folder.</summary>
-        internal static string FreePath(string folder, string fileName)
-        {
-            string path = Path.Combine(folder, fileName);
-            string name = Path.GetFileNameWithoutExtension(fileName), extension = Path.GetExtension(fileName);
-            for (int n = 2; File.Exists(path); n++)
-                path = Path.Combine(folder, $"{name} ({n}){extension}");
-            return path;
-        }
-
-        /// <summary>A file path under wwwroot as stored in the database: relative, forward slashes.</summary>
-        public static string ToDatabasePath(string webRootPath, string filePath) =>
-            Path.GetRelativePath(webRootPath, filePath).Replace('\\', '/');
-
-        private static List<(int Number, string Path)> NumberedFolders(string parent, string prefix) =>
-            [.. Directory.GetDirectories(parent)
-                .Select(path => (Match: NumberedFolderRegex().Match(System.IO.Path.GetFileName(path)), Path: path))
-                .Where(x => x.Match.Success && string.Equals(x.Match.Groups["prefix"].Value, prefix, StringComparison.OrdinalIgnoreCase))
-                .Select(x => (int.Parse(x.Match.Groups["number"].Value), x.Path))
-                .OrderBy(x => x.Item1)];
-
-        [GeneratedRegex(@"^(?<prefix>.+?) (?<number>\d+)$")]
-        private static partial Regex NumberedFolderRegex();
     }
 }

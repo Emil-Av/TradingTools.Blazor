@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Models;
 using Models.RequestModels;
+using Microsoft.EntityFrameworkCore;
+using Models.Screenshots;
 using Models.Trades;
 using Models.ViewModels;
 using Newtonsoft.Json;
@@ -194,6 +196,7 @@ namespace TradingTools.Blazor.Services
         private static T WithSortedAddOns<T>(T trade) where T : BaseTrade
         {
             trade.SortAddOns();
+            TradeScreenshots.Sort(trade.Screenshots);
             return trade;
         }
 
@@ -256,7 +259,7 @@ namespace TradingTools.Blazor.Services
         private async Task SetEspressoCurrentTrade()
         {
             _tradesVM.AllTradesInSampleSize = [.. (await _unitOfWork.Espresso.GetAllAsync(trade => trade.SampleSizeId == _tradesVM.CurrentSampleSize.Id,
-                                                                                            includeProperties: "Journal," + TradeAddOns.Include)).OrderBy(t => t.Id).Select(t => WithSortedAddOns(t)).Cast<object>()];
+                                                                                            includeProperties: "Journal," + TradeAddOns.Include + "," + nameof(BaseTrade.Screenshots))).OrderBy(t => t.Id).Select(t => WithSortedAddOns(t)).Cast<object>()];
 
             _tradesVM.CurrentTrade = _tradesVM.AllTradesInSampleSize.Last() as BaseTrade;
             _tradesVM.EspressoTrade = _tradesVM.AllTradesInSampleSize.Last() as Espresso;
@@ -265,7 +268,7 @@ namespace TradingTools.Blazor.Services
         private async Task SetBrunchBreakCurrentTrade()
         {
             _tradesVM.AllTradesInSampleSize = [.. (await _unitOfWork.BrunchBreak.GetAllAsync(trade => trade.SampleSizeId == _tradesVM.CurrentSampleSize.Id,
-                                                                                            includeProperties: "Journal," + TradeAddOns.Include)).OrderBy(t => t.Id).Select(t => WithSortedAddOns(t)).Cast<object>()];
+                                                                                            includeProperties: "Journal," + TradeAddOns.Include + "," + nameof(BaseTrade.Screenshots))).OrderBy(t => t.Id).Select(t => WithSortedAddOns(t)).Cast<object>()];
 
             _tradesVM.CurrentTrade = _tradesVM.AllTradesInSampleSize.Last() as BaseTrade;
             _tradesVM.BrunchBreakTrade = _tradesVM.AllTradesInSampleSize.Last() as BrunchBreak;
@@ -274,7 +277,7 @@ namespace TradingTools.Blazor.Services
         private async Task SetSRSCurrentTrade()
         {
             _tradesVM.AllTradesInSampleSize = [.. (await _unitOfWork.SRS.GetAllAsync(trade => trade.SampleSizeId == _tradesVM.CurrentSampleSize.Id,
-                                                                                            includeProperties: "Journal," + TradeAddOns.Include)).OrderBy(t => t.Id).Select(t => WithSortedAddOns(t)).Cast<object>()];
+                                                                                            includeProperties: "Journal," + TradeAddOns.Include + "," + nameof(BaseTrade.Screenshots))).OrderBy(t => t.Id).Select(t => WithSortedAddOns(t)).Cast<object>()];
 
             _tradesVM.CurrentTrade = _tradesVM.AllTradesInSampleSize.Last() as BaseTrade;
             _tradesVM.SRSTrade = _tradesVM.AllTradesInSampleSize.Last() as SRS;
@@ -354,43 +357,24 @@ namespace TradingTools.Blazor.Services
             _validationMonitor.RequestValidation();
         }
 
-        public async Task<List<string>> UploadScreenshotsAsync(int tradeId, IFormFile[] files)
+        public async Task<List<Screenshot>> UploadScreenshotsAsync(int tradeId, IFormFile[] files)
         {
-            // Get the trade to determine its folder path
-            var trade = await _unitOfWork.BaseTrade.GetAsync(t => t.Id == tradeId) ?? throw new ArgumentException($"Trade with ID {tradeId} not found.");
+            if (!await _db.Set<BaseTrade>().AnyAsync(t => t.Id == tradeId)) throw new ArgumentException($"Trade with ID {tradeId} not found.");
 
-            // The folder of the screenshots it has; a trade with none left (its last one was deleted) gets its own folder by id.
-            trade.ScreenshotsUrls ??= [];
-            string tradeFolderPath;
-            if (trade.ScreenshotsUrls.Count > 0)
+            // After the ones the trade has, in the order given.
+            var positions = await _db.Screenshots.Where(s => s.BaseTradeId == tradeId).Select(s => s.Position).ToListAsync();
+            int next = positions.Count == 0 ? 0 : positions.Max() + 1;
+
+            var added = await TradeScreenshots.FromFilesAsync(files, next);
+            foreach (var screenshot in added)
             {
-                // Extract the folder path from the first screenshot URL
-                string firstScreenshotUrl = trade.ScreenshotsUrls![0];
-                // Use Path.GetFullPath with normalized slashes for cross-platform compatibility
-                string normalizedUrl = firstScreenshotUrl.Replace("\\", "/");
-                var pathParts = new[] { webHostEnvironment.WebRootPath }.Concat(normalizedUrl.Split('/').Where(s => !string.IsNullOrEmpty(s))).ToArray();
-                string fullPath = Path.Combine(pathParts);
-                tradeFolderPath = Path.GetDirectoryName(fullPath)!;
+                screenshot.BaseTradeId = tradeId;
+                _db.Screenshots.Add(screenshot);
             }
-            else
-            {
-                // Read on its own, not included in the trade: the trade is saved with Update below, which would try to
-                // attach the sample size too - and the page already tracks it.
-                var sampleSize = await _unitOfWork.SampleSize.GetAsync(s => s.Id == trade.SampleSizeId)
-                    ?? throw new InvalidOperationException($"The sample size of trade {tradeId} was not found.");
-                tradeFolderPath = ScreenshotStorage.FolderByTradeId(
-                    webHostEnvironment.WebRootPath, sampleSize.SampleSizeType, trade.GetType().Name, sampleSize.TimeFrame, trade.Id);
-            }
+            await _db.SaveChangesAsync();
+            TradeScreenshots.ReleaseImages(_db, added);
 
-            // Save the files to disk
-            var newScreenshotPaths = await ScreenshotStorage.SaveFilesToFolderAsync(webHostEnvironment.WebRootPath, tradeFolderPath, files);
-
-            trade.ScreenshotsUrls.AddRange(newScreenshotPaths);
-
-            await _unitOfWork.BaseTrade.UpdateAsync(trade);
-            await _unitOfWork.SaveAsync();
-
-            return trade.ScreenshotsUrls;
+            return added;
         }
 
         /// <summary>
@@ -401,7 +385,7 @@ namespace TradingTools.Blazor.Services
         {
             if (!filter.IsSet || filter.IsBackwards) return [];
 
-            const string include = "Journal,SampleSize,SampleSize.Review," + TradeAddOns.Include;
+            const string include = "Journal,SampleSize,SampleSize.Review," + TradeAddOns.Include + "," + nameof(BaseTrade.Screenshots);
             // The dates narrow the query; the symbol and the result are checked by the filter itself.
             DateOnly? from = filter.EffectiveFrom, to = filter.EffectiveTo;
 

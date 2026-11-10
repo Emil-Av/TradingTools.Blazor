@@ -23,7 +23,7 @@ namespace TradingTools.Blazor.Services.Interfaces
         Task<TradesVM> LoadTimeFrameAsync(TradesLoadTimeFrameRequestModel requestModel);
         Task<TradesVM> LoadStrategyAsync(Strategy strategy, SampleSizeType sampleSizeType);
         Task<TradesVM> LoadTypeAsync(SampleSizeType sampleSizeType, Strategy strategy);
-        Task<List<string>> UploadScreenshotsAsync(int tradeId, IFormFile[] files);
+        Task<List<Models.Screenshots.Screenshot>> UploadScreenshotsAsync(int tradeId, IFormFile[] files);
 
         /// <summary>The sample size a trade belongs to, or null if the trade doesn't exist (used to open a trade directly from a link).</summary>
         Task<int?> GetSampleSizeIdOfTradeAsync(int tradeId);

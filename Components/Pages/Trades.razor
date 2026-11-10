@@ -3,6 +3,7 @@
 @using TradingTools.Blazor.Services.AddOns
 @using TradingTools.Blazor.Services.Dashboard
 @using TradingTools.Blazor.Services.Reviews
+@using TradingTools.Blazor.Services.Screenshots
 
 <MudProviders />
 
@@ -133,11 +134,11 @@ else
                The box is always there, also for a trade without screenshots: going through the trades in full screen
                must never take it off the page, or the browser leaves full screen. Its class never changes either: the
                CSS fallback for full screen adds is-maximized to it, and a re-rendered class would drop that. *@
-            @{ var urls = CurrentBase!.ScreenshotsUrls ?? []; }
+            @{ var shots = CurrentBase!.Screenshots; }
             <div class="app-carousel" data-fullscreen>
-                @if (urls.Count > 0)
+                @if (shots.Count > 0)
                 {
-                    <img class="app-carousel-img" src="@("/" + urls[Math.Min(_screenshotIndex, urls.Count - 1)])" alt="Screenshot @(_screenshotIndex + 1) of @urls.Count" />
+                    <img class="app-carousel-img" src="@TradeScreenshots.Url(shots[Math.Min(_screenshotIndex, shots.Count - 1)])" alt="Screenshot @(_screenshotIndex + 1) of @shots.Count" />
                 }
                 else
                 {
@@ -147,18 +148,18 @@ else
                     <svg class="app-fs-enter" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
                     <svg class="app-fs-exit" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /></svg>
                 </button>
-                @if (urls.Count > 0)
+                @if (shots.Count > 0)
                 {
                     @* Not shown in full screen: its confirmation dialog would open behind the full-screen box. *@
                     <button type="button" class="app-carousel-btn app-carousel-del" title="Delete this screenshot" aria-label="Delete this screenshot" disabled="@_saving" @onclick="ConfirmDeleteScreenshotAsync">
                         <MudIcon Icon="@Icons.Material.Filled.DeleteOutline" Size="Size.Small" />
                     </button>
                 }
-                @if (urls.Count > 1)
+                @if (shots.Count > 1)
                 {
                     <button class="app-carousel-btn" style="left:14px;" data-fullscreen-prev aria-label="Previous screenshot" @onclick="PrevScreenshot"><MudIcon Icon="@Icons.Material.Filled.ChevronLeft" /></button>
                     <button class="app-carousel-btn" style="right:14px;" data-fullscreen-next aria-label="Next screenshot" @onclick="NextScreenshot"><MudIcon Icon="@Icons.Material.Filled.ChevronRight" /></button>
-                    <div class="app-carousel-count">@(_screenshotIndex + 1) / @urls.Count</div>
+                    <div class="app-carousel-count">@(_screenshotIndex + 1) / @shots.Count</div>
                 }
 
                 @* Full screen only: go through the trades and the sample sizes (↑ / ↓ for the trades), and the result. *@
