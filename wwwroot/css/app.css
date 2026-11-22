@@ -1172,14 +1172,27 @@ h1:focus {
     overflow-y: auto;
 }
 .app-tom-month {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    background: none;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
     font-size: 10.5px;
     font-weight: 700;
     letter-spacing: .05em;
     text-transform: uppercase;
     color: var(--app-text-secondary);
-    padding: 12px 10px 6px;
+    padding: 8px 6px;
 }
-.app-tom-month:first-child { padding-top: 4px; }
+.app-tom-month:hover { background: var(--app-surface-variant); color: var(--app-text-primary); }
+.app-tom-month-chevron { transition: transform .15s ease; }
+.app-tom-month.open .app-tom-month-chevron { transform: rotate(90deg); }
+.app-tom-month-count { margin-left: auto; font-weight: 600; letter-spacing: 0; }
 .app-tom-item {
     display: grid;
     grid-template-columns: auto 1fr;

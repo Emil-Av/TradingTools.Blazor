@@ -39,7 +39,21 @@ namespace TradingTools.Blazor.Components.Pages
         private TomSession _newSession = TomSession.EU;
         private TomTrader _newTrader = TomTrader.Tom;
 
-        private TomFilter _filter = new();
+        private static DateOnly Today => DateOnly.FromDateTime(DateTime.Today);
+
+        // The current year to start with: earlier years are picked in the filters.
+        private TomFilter _filter = TomFilter.Default(Today);
+
+        // The months opened or closed by hand; the others are as TomMonths.OpensByDefault says.
+        private readonly Dictionary<(int Year, int Month), bool> _monthOpen = [];
+
+        private bool IsOpen(TomMonth month, int monthsShown) =>
+            _monthOpen.TryGetValue((month.Year, month.Month), out var open) ? open : TomMonths.OpensByDefault(month, monthsShown, Today);
+
+        private void ToggleMonth(TomMonth month, int monthsShown) =>
+            _monthOpen[(month.Year, month.Month)] = !IsOpen(month, monthsShown);
+
+        private void OpenMonthOf(TomStream stream) => _monthOpen[(stream.Date.Year, stream.Date.Month)] = true;
 
         /// <summary>The streams the filters let through.</summary>
         private List<TomStream> Shown => [.. _filter.Apply(_streams)];
@@ -56,7 +70,7 @@ namespace TradingTools.Blazor.Components.Pages
         protected override async Task OnInitializedAsync()
         {
             _streams = await TomService.GetStreamsAsync();
-            _stream = TomMonths.Group(_streams).FirstOrDefault()?.Streams[0];
+            _stream = TomMonths.Group(Shown).FirstOrDefault()?.Streams[0];
             _loading = false;
         }
 
@@ -80,6 +94,7 @@ namespace TradingTools.Blazor.Components.Pages
                 var stream = await TomService.CreateStreamAsync(DateOnly.FromDateTime(_newDate ?? DateTime.Today), _newUrl, _newSession, _newTrader);
                 _streams.Add(stream);
                 _creating = false;
+                OpenMonthOf(stream);
                 SelectStream(stream);
                 Snackbar.Add("Stream added. Add its trades with Add trade.", Severity.Success);
             }, "adding the stream");
@@ -118,7 +133,7 @@ namespace TradingTools.Blazor.Components.Pages
             {
                 await TomService.DeleteStreamAsync(stream);
                 _streams.Remove(stream);
-                _stream = TomMonths.Group(_streams).FirstOrDefault()?.Streams[0];
+                _stream = TomMonths.Group(Shown).FirstOrDefault()?.Streams[0];
                 ShowTrade(0);
                 Snackbar.Add("Stream deleted.", Severity.Success);
             }, "deleting the stream");

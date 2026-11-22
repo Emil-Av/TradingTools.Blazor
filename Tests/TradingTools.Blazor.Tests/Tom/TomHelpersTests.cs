@@ -129,6 +129,23 @@ namespace TradingTools.Blazor.Tests.Tom
         [Fact]
         public void No_streams_no_months() => TomMonths.Group([]).Should().BeEmpty();
 
+        [Fact]
+        public void The_current_month_starts_open_and_past_months_closed()
+        {
+            var today = new DateOnly(2026, 11, 22);
+            var months = TomMonths.Group([Stream(1, 2026, 11, 3), Stream(2, 2026, 10, 1), Stream(3, 2026, 9, 5)]);
+
+            months.Select(m => TomMonths.OpensByDefault(m, months.Count, today)).Should().Equal(true, false, false);
+        }
+
+        [Fact]
+        public void The_only_month_shown_starts_open_even_when_past()
+        {
+            var months = TomMonths.Group([Stream(1, 2025, 3, 3)]);
+
+            TomMonths.OpensByDefault(months.Single(), 1, new DateOnly(2026, 11, 22)).Should().BeTrue();
+        }
+
         #endregion
     }
 }

@@ -92,6 +92,42 @@ namespace TradingTools.Blazor.Tests.Tom
         }
 
         [Fact]
+        public void The_default_shows_only_the_current_year()
+        {
+            var filter = TomFilter.Default(new DateOnly(2026, 11, 22));
+
+            filter.IsEmpty.Should().BeFalse();
+            Ids(filter).Should().Equal(1, 2, 3, 4, 5);
+            Ids(filter with { Year = 2025 }).Should().Equal(6);
+            Ids(filter with { Year = null }).Should().Equal(1, 2, 3, 4, 5, 6);
+        }
+
+        [Fact]
+        public void A_date_range_reaches_past_the_year()
+        {
+            var filter = TomFilter.Default(new DateOnly(2026, 11, 22)) with { From = new DateOnly(2025, 9, 1), To = new DateOnly(2026, 9, 3) };
+
+            Ids(filter).Should().Equal(1, 6);
+        }
+
+        [Fact]
+        public void Changing_the_year_drops_a_month_of_another_year()
+        {
+            var filter = new TomFilter(Year: 2026, Month: new DateOnly(2026, 9, 1));
+
+            filter.WithYear(2026).Month.Should().Be(new DateOnly(2026, 9, 1));
+            filter.WithYear(null).Month.Should().Be(new DateOnly(2026, 9, 1));
+            filter.WithYear(2025).Month.Should().BeNull();
+        }
+
+        [Fact]
+        public void The_year_filter_offers_the_years_with_streams_and_the_current_one()
+        {
+            TomFilter.YearsOf(Streams, new DateOnly(2027, 1, 2)).Should().Equal(2027, 2026, 2025);
+            TomFilter.MonthsOf(Streams, 2025).Should().Equal(new DateOnly(2025, 9, 1));
+        }
+
+        [Fact]
         public void A_stream_is_named_by_its_trader_and_session()
         {
             TomLabels.Of(S(1, 10, 1, TomSession.US, TomTrader.Andi)).Should().Be("Andi · US");

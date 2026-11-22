@@ -83,23 +83,36 @@ namespace TradingTools.Blazor.Services.Tom
                 .OrderByDescending(g => g.Key.Year).ThenByDescending(g => g.Key.Month)
                 .Select(g => new TomMonth(g.Key.Year, g.Key.Month,
                     [.. g.OrderByDescending(s => s.Date).ThenByDescending(s => s.Id)]))];
+
+        /// <summary>
+        /// Whether a month starts open in the list: the current month does, past months don't - except when it's the only
+        /// month the list shows (e.g. one month filtered), which would otherwise show nothing but a closed header.
+        /// </summary>
+        public static bool OpensByDefault(TomMonth month, int monthsShown, DateOnly today) =>
+            monthsShown == 1 || (month.Year == today.Year && month.Month == today.Month);
     }
 }
 
 namespace TradingTools.Blazor.Services.Tom
 {
     /// <summary>
-    /// Which streams the list shows. Every part is optional and they all apply together: a month, a date range
-    /// (both ends included), a session and a trader. A stream without a session or trader (added before those were
-    /// recorded) only matches when that part isn't filtered.
+    /// Which streams the list shows. Every part is optional and they all apply together: a year, a month, a date range
+    /// (both ends included), a session and a trader. The year only applies while no date range is set - a range picks
+    /// its own days, in any year. A stream without a session or trader (added before those were recorded) only matches
+    /// when that part isn't filtered.
     /// </summary>
     public sealed record TomFilter(
-        DateOnly? Month = null, DateOnly? From = null, DateOnly? To = null, TomSession? Session = null, TomTrader? Trader = null)
+        DateOnly? Month = null, DateOnly? From = null, DateOnly? To = null, TomSession? Session = null, TomTrader? Trader = null,
+        int? Year = null)
     {
-        public bool IsEmpty => Month is null && From is null && To is null && Session is null && Trader is null;
+        /// <summary>What the page starts with, and Clear filters goes back to: the streams of the current year.</summary>
+        public static TomFilter Default(DateOnly today) => new(Year: today.Year);
+
+        public bool IsEmpty => Month is null && From is null && To is null && Session is null && Trader is null && Year is null;
 
         public bool Matches(TomStream stream) =>
-            (Month is not { } month || (stream.Date.Year == month.Year && stream.Date.Month == month.Month))
+            (Year is not { } year || From is not null || To is not null || stream.Date.Year == year)
+            && (Month is not { } month || (stream.Date.Year == month.Year && stream.Date.Month == month.Month))
             && (From is not { } from || stream.Date >= from)
             && (To is not { } to || stream.Date <= to)
             && (Session is not { } session || stream.Session == session)
@@ -107,9 +120,21 @@ namespace TradingTools.Blazor.Services.Tom
 
         public IEnumerable<TomStream> Apply(IEnumerable<TomStream> streams) => streams.Where(Matches);
 
-        /// <summary>The months that have streams, newest first (the first day of each), for the month filter.</summary>
-        public static IReadOnlyList<DateOnly> MonthsOf(IEnumerable<TomStream> streams) =>
-            [.. streams.Select(s => new DateOnly(s.Date.Year, s.Date.Month, 1)).Distinct().OrderDescending()];
+        /// <summary>Another year (null: all years). A month filter of a different year is dropped, as it would match nothing.</summary>
+        public TomFilter WithYear(int? year) =>
+            this with { Year = year, Month = year is { } y && Month is { } m && m.Year != y ? null : Month };
+
+        /// <summary>
+        /// The months that have streams, newest first (the first day of each), for the month filter - only those of the
+        /// year when one is given.
+        /// </summary>
+        public static IReadOnlyList<DateOnly> MonthsOf(IEnumerable<TomStream> streams, int? year = null) =>
+            [.. streams.Where(s => year is not { } y || s.Date.Year == y)
+                .Select(s => new DateOnly(s.Date.Year, s.Date.Month, 1)).Distinct().OrderDescending()];
+
+        /// <summary>The years that have streams, and the current one even without any, newest first, for the year filter.</summary>
+        public static IReadOnlyList<int> YearsOf(IEnumerable<TomStream> streams, DateOnly today) =>
+            [.. streams.Select(s => s.Date.Year).Append(today.Year).Distinct().OrderDescending()];
     }
 
     public static class TomLabels

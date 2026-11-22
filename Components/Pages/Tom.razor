@@ -63,10 +63,20 @@
     {
         @* Which streams the list shows: all filters apply together. *@
         <div class="app-card app-tom-filters">
+            @* The list shows the current year to start with; earlier years are picked here (or with a date range). *@
+            <div class="app-tom-choice">
+                <MudSelect T="int?" Margin="Margin.Dense" Label="Year" Value="_filter.Year" ValueChanged="@(y => SetFilter(_filter.WithYear(y)))" Variant="Variant.Outlined">
+                    <MudSelectItem T="int?" Value="@((int?)null)">All years</MudSelectItem>
+                    @foreach (var y in TomFilter.YearsOf(_streams, Today))
+                    {
+                        <MudSelectItem T="int?" Value="@((int?)y)">@y</MudSelectItem>
+                    }
+                </MudSelect>
+            </div>
             <div class="app-tom-choice">
                 <MudSelect T="DateOnly?" Margin="Margin.Dense" Label="Month" Value="_filter.Month" ValueChanged="@(m => SetFilter(_filter with { Month = m }))" Variant="Variant.Outlined">
                     <MudSelectItem T="DateOnly?" Value="@((DateOnly?)null)">All months</MudSelectItem>
-                    @foreach (var m in TomFilter.MonthsOf(_streams))
+                    @foreach (var m in TomFilter.MonthsOf(_streams, _filter.Year))
                     {
                         <MudSelectItem T="DateOnly?" Value="@((DateOnly?)m)">@m.ToString("MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture)</MudSelectItem>
                     }
@@ -95,30 +105,41 @@
                 </MudSelect>
             </div>
             <span class="app-tom-filter-count">@Shown.Count of @_streams.Count @(_streams.Count == 1 ? "stream" : "streams")</span>
-            @if (!_filter.IsEmpty)
+            @if (_filter != TomFilter.Default(Today))
             {
-                <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Filled.FilterAltOff" OnClick="@(() => SetFilter(new TomFilter()))">Clear filters</MudButton>
+                <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Filled.FilterAltOff" OnClick="@(() => SetFilter(TomFilter.Default(Today)))">Clear filters</MudButton>
             }
         </div>
 
         <div class="app-tom">
-            @* The streams the filters let through, grouped by month (newest first). *@
+            @* The streams the filters let through, grouped by month (newest first). Each month opens and closes; the
+               current month starts open, past months closed. *@
             <nav class="app-card app-tom-list" aria-label="Streams">
                 @if (Shown.Count == 0)
                 {
                     <div class="app-tom-empty">No streams match the filters.</div>
                 }
-                @foreach (var month in TomMonths.Group(Shown))
+                @{ var months = TomMonths.Group(Shown); }
+                @foreach (var month in months)
                 {
-                    <div class="app-tom-month">@month.Label</div>
-                    @foreach (var listed in month.Streams)
+                    var group = month;
+                    bool open = IsOpen(group, months.Count);
+                    <button type="button" class="app-tom-month @(open ? "open" : null)" aria-expanded="@(open ? "true" : "false")" @onclick="() => ToggleMonth(group, months.Count)">
+                        <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" Class="app-tom-month-chevron" />
+                        <span>@group.Label</span>
+                        <span class="app-tom-month-count">@group.Streams.Count</span>
+                    </button>
+                    @if (open)
                     {
-                        var current = listed;
-                        <button type="button" class="app-tom-item @(current == _stream ? "active" : null)" @onclick="() => SelectStream(current)">
-                            <span class="app-tom-item-date">@current.Date.ToString("ddd dd MMM", System.Globalization.CultureInfo.InvariantCulture)</span>
-                            <span class="app-tom-item-title">@TomLabels.Of(current)</span>
-                            <span class="app-tom-item-count">@current.Trades.Count @(current.Trades.Count == 1 ? "trade" : "trades")</span>
-                        </button>
+                        @foreach (var listed in group.Streams)
+                        {
+                            var current = listed;
+                            <button type="button" class="app-tom-item @(current == _stream ? "active" : null)" @onclick="() => SelectStream(current)">
+                                <span class="app-tom-item-date">@current.Date.ToString("ddd dd MMM", System.Globalization.CultureInfo.InvariantCulture)</span>
+                                <span class="app-tom-item-title">@TomLabels.Of(current)</span>
+                                <span class="app-tom-item-count">@current.Trades.Count @(current.Trades.Count == 1 ? "trade" : "trades")</span>
+                            </button>
+                        }
                     }
                 }
             </nav>
