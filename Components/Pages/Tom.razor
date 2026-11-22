@@ -74,11 +74,12 @@
                 </MudSelect>
             </div>
             <div class="app-tom-choice">
-                <MudSelect T="DateOnly?" Margin="Margin.Dense" Label="Month" Value="_filter.Month" ValueChanged="@(m => SetFilter(_filter with { Month = m }))" Variant="Variant.Outlined">
+                <MudSelect T="DateOnly?" Margin="Margin.Dense" Label="Month" Value="_filter.Month" ValueChanged="@(m => SetFilter(_filter with { Month = m }))" Variant="Variant.Outlined"
+                           ToStringFunc="@(m => m is { } d ? MonthText(d) : null)">
                     <MudSelectItem T="DateOnly?" Value="@((DateOnly?)null)">All months</MudSelectItem>
                     @foreach (var m in TomFilter.MonthsOf(_streams, _filter.Year))
                     {
-                        <MudSelectItem T="DateOnly?" Value="@((DateOnly?)m)">@m.ToString("MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture)</MudSelectItem>
+                        <MudSelectItem T="DateOnly?" Value="@((DateOnly?)m)">@MonthText(m)</MudSelectItem>
                     }
                 </MudSelect>
             </div>

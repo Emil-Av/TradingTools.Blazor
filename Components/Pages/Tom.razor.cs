@@ -53,6 +53,13 @@ namespace TradingTools.Blazor.Components.Pages
         private void ToggleMonth(TomMonth month, int monthsShown) =>
             _monthOpen[(month.Year, month.Month)] = !IsOpen(month, monthsShown);
 
+        /// <summary>
+        /// A month in the month filter: just "November" while a year is picked in the year filter; with All years the
+        /// months of different years need their year, "November 2026".
+        /// </summary>
+        private string MonthText(DateOnly month) =>
+            month.ToString(_filter.Year is null ? "MMMM yyyy" : "MMMM", System.Globalization.CultureInfo.InvariantCulture);
+
         private void OpenMonthOf(TomStream stream) => _monthOpen[(stream.Date.Year, stream.Date.Month)] = true;
 
         /// <summary>The streams the filters let through.</summary>
